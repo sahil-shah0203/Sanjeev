@@ -1,0 +1,58 @@
+# What Sahil needs to do manually
+
+The app can already run locally without an account or API key. These tasks concern services, credentials, content review, and release evidence that require your accounts or real users.
+
+## 1. Try your local app
+
+Run `npm run dev` and open `http://localhost:3000`, or use `npm run build` followed by `npm run start` to test offline mode. Import `forsahil.apkg`. Its three cards are **suspended in the source export**: select **Resume suspended cards on import** if you want to study them immediately. Their suspension is preserved by default.
+
+Download a native backup from Settings after important study sessions. Keep your existing Anki collection until your actual templates/history have passed the compatibility checks.
+
+## 2. Connect Supabase for cloud accounts
+
+1. Create a Supabase project under your account. Choose a suitable region and save its database password privately.
+2. Install the official Supabase CLI, run `supabase login`, then `supabase link --project-ref YOUR_PROJECT_REF` from this repository. Run `supabase db push` to apply the migration files. Alternatively, execute the SQL files in filename order in a fresh project's SQL editor. Do not rerun already-applied migrations manually.
+3. Copy `.env.example` to **`apps/web/.env.local`** for the web app and **`.env`** at the repository root for the worker/Compose. Fill in:
+   - `NEXT_PUBLIC_SUPABASE_URL`: project URL.
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: public publishable key (legacy public anon key also works).
+   - `SUPABASE_SERVICE_ROLE_KEY`: server-only service-role key for private media and account deletion.
+   - `DATABASE_URL`: server PostgreSQL connection string for the project; use a database role allowed to `SET LOCAL ROLE recall_server`. The migrations grant that role to `postgres`. Use the provider's TLS connection settings and correctly URL-encode the password.
+   - `APP_ORIGIN`: the exact browser origin, initially `http://localhost:3000`.
+4. In Supabase Auth, set Site URL and allow `${APP_ORIGIN}/auth/callback`. Configure a production email/SMTP provider before inviting students. Open sign-in links in the browser where sign-in began.
+5. Rebuild/restart the web app after changing `NEXT_PUBLIC_*` values. Confirm the `recall-media` bucket is private and the migrations completed.
+6. Sign in from Settings, choose **Bring guest library into this account**, and wait for acknowledgement. The guest copy remains on this device for recovery.
+
+Official references: [Supabase local development](https://supabase.com/docs/guides/local-development/cli/getting-started), [migrations/deployment](https://supabase.com/docs/guides/deployment/managing-environments), and [Auth redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
+
+For local cloud development instead, install Docker Desktop and the Supabase CLI, run `supabase start`, and use the local project values it prints. Configuration is in `supabase/config.toml`; local test mail is available through the local mail viewer. Docker was not available in the build workspace, so this full service stack still needs a local run.
+
+## 3. Deploy the web server and worker
+
+Choose your host and domain. Provide the public Supabase variables at **build time**, and all server secrets through the host's environment/secret manager. Set `APP_ORIGIN` and Supabase Auth redirects to the final HTTPS origin.
+
+The included `Dockerfile` has `web` and `worker` targets. With a configured root `.env`:
+
+```sh
+docker compose up --build -d
+docker compose --profile cloud up --build -d
+```
+
+The first command starts the app; the second also runs the persistent worker. Put the web service behind HTTPS. A normal Node host can use `npm run build` / `npm run start`, with `npm run worker` supervised separately. Do not place the worker in a short-lived HTTP function.
+
+No site has been publicly deployed, no accounts created, and no paid model requests made during this build. Docker configuration is provided but was not executed here.
+
+## 4. Enable reviewed practice only when ready
+
+Keep both feature flags false for ordinary review. For a controlled pilot:
+
+1. Assign a qualified reviewer to each collection. Use the SQL template in [operations](operations.md); this is an administrator action, not a browser permission.
+2. Turn on `ENABLE_ADAPTIVE_PRACTICE=true` on the web service once approved activities exist. A learner must also opt in from Settings.
+3. Reviewers can author drafts through **Write a draft** without a model. For generation, verify the chosen provider/model's current availability, token prices, privacy/retention terms, and your intended data use. Set `LLM_PROVIDER=openai`, `LLM_MODEL`, `LLM_API_KEY`, the two per-million token prices, and a positive daily spend limit on the worker. Enable `ENABLE_AI_GENERATION=true` on web and worker.
+4. Sign in, consent to selected-source processing, select one source note, and request a draft. Use `LLM_PROVIDER=fixture` to test only synthetic demo recall without paid calls; it abstains on medical sources.
+5. The assigned reviewer checks fidelity **and** medical correctness/currentness, edits the item, supplies the answer/rationale/rubric, and approves it. All cognitive tasks are review-gated. Reporting or source changes quarantine practice.
+
+## 5. Complete the live release checks
+
+Use the concrete checklist in [verification](verification.md): real email sign-in, two signed-in devices, offline divergence/reconnection, media transfer, sign-out/account switching, account deletion, and a restore drill. Test your target Anki versions and representative history-bearing/image-heavy decks. Check iOS Safari, Android Chrome, Firefox, keyboard-only use, and a screen reader.
+
+Record backup retention/RPO/RTO for the hosting plan, verify recovery, and review content licensing, app branding, and privacy disclosures before inviting students. Qualified medical review and an educational evaluation cannot be replaced by the code's unit tests.

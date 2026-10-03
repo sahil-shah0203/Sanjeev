@@ -1,0 +1,15 @@
+node_modules
+**/.next
+.git
+.local
+.tools
+.env
+.env.*
+*.apkg
+*.recall
+test-results
+playwright-report
+tests/fixtures/private
+coverage
+01_learning_research_and_product_rules.md
+02_app_build_specification.md

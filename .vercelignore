@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+forsahil.apkg
+*.recall
+node_modules
+.next
+apps/web/.next
+test-results
+playwright-report
+.local
+.vercel
+.git

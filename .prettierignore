@@ -1,0 +1,10 @@
+node_modules
+**/.next
+apps/web/public
+package-lock.json
+pnpm-lock.yaml
+test-results
+playwright-report
+01_learning_research_and_product_rules.md
+02_app_build_specification.md
+.env.example
