@@ -87,6 +87,12 @@ it("syncs actual import outboxes, survives duplicate requests, and isolates curs
   const receipts = await send(alice, device);
   expect(receipts.every((r) => r.status === "ok")).toBe(true);
   expect(await send(alice, device)).toEqual(receipts);
+  const original = (await device.outbox.toArray()).sort(mutationOrder)[0];
+  const reused = await push(alice, {
+    schemaVersion: 1,
+    mutations: [{ ...original, at: "2026-01-01T00:00:00.000Z" }],
+  });
+  expect(reused.results[0].status).toBe("error");
   expect((await pull(bob, 0, 100)).changes).toHaveLength(0);
   const first = await pull(alice, 0, 3);
   expect(first.changes).toHaveLength(3);

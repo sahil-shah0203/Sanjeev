@@ -79,6 +79,49 @@ it("reimport does not duplicate cards or reset reviews, and source edits retain 
   expect(await db.states.get(b.cards[0].id)).toEqual(state);
   expect((await db.notes.get(b.notes[0].id))?.revisions).toHaveLength(1);
 });
+it("rolls back schedule, event, sequence and session when outbox persistence fails", async () => {
+  const bundle = await demoBundle();
+  await commitImport(db, bundle);
+  const card = bundle.cards[0];
+  const state = (await db.states.get(card.id))!;
+  const session = await startSession(db, "", 15);
+  const before = {
+    outbox: await db.outbox.count(),
+    sequence: await db.meta.get("sequence"),
+  };
+  const eventId = id();
+  const fail = (_key: unknown, value: { kind?: string }) => {
+    if (value.kind === "review")
+      throw new Error("Simulated storage exhaustion");
+  };
+  db.outbox.hook("creating", fail);
+  const input = {
+    card,
+    state,
+    session,
+    rating: "good" as const,
+    qualification: {
+      original: true,
+      attempted: true,
+      assisted: false,
+      contaminated: false,
+    },
+    durationMs: 2000,
+    contentVersion: bundle.notes[0].version,
+    eventId,
+  };
+  await expect(saveReview(db, input)).rejects.toThrow(
+    "Simulated storage exhaustion",
+  );
+  expect(await db.states.get(card.id)).toEqual(state);
+  expect(await db.reviews.count()).toBe(0);
+  expect(await db.sessions.get(session.id)).toEqual(session);
+  expect(await db.outbox.count()).toBe(before.outbox);
+  expect(await db.meta.get("sequence")).toEqual(before.sequence);
+  db.outbox.hook("creating").unsubscribe(fail);
+  await saveReview(db, input);
+  expect(await db.reviews.count()).toBe(1);
+});
 it("restores a complete library into a clean profile, refuses overwrite, and partitions owners", async () => {
   await commitImport(db, await demoBundle());
   const backup = await exportLibrary(db);

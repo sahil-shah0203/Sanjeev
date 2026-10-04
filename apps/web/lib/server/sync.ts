@@ -123,11 +123,19 @@ export async function push(owner: string, input: unknown) {
         ]);
         const prior = (
           await db.query(
-            "SELECT receipt FROM public.mutation_receipts WHERE owner_id=$1 AND mutation_id=$2",
+            "SELECT receipt,payload FROM public.mutation_receipts WHERE owner_id=$1 AND mutation_id=$2",
             [owner, mutation.id],
           )
         ).rows[0];
-        if (prior) return prior.receipt;
+        if (prior) {
+          if (stableJson(prior.payload) !== stableJson(mutation))
+            throw new HttpError(
+              409,
+              "IDEMPOTENCY_REUSED",
+              "A mutation identifier was reused with different content. Local work is preserved.",
+            );
+          return prior.receipt;
+        }
         let conflict: string | undefined;
         let version = 0;
         if (mutation.kind === "review") {

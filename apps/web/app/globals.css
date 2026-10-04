@@ -5,7 +5,7 @@
   --bg: #f8faf9;
   --surface: #fff;
   --text: #172522;
-  --muted: #63726c;
+  --muted: #56645e;
   --border: #dfe7e2;
   --accent: #12695a;
   --accent-soft: #e8f0eb;
@@ -225,7 +225,7 @@ kbd {
 .nav-caption {
   font-size: 10px;
   letter-spacing: 1.7px;
-  color: #819087;
+  color: #596b60;
   font-weight: 650;
   padding-left: 13px;
   margin-bottom: 13px;
@@ -354,7 +354,7 @@ kbd {
   justify-content: space-between;
   border-top: 1px solid var(--border);
   font-size: 10px;
-  color: #89918a;
+  color: #59685f;
   gap: 20px;
 }
 .page-heading {
@@ -547,7 +547,7 @@ kbd {
 }
 .study-plan > p {
   font-size: 12px;
-  color: #677867;
+  color: #4f624f;
   max-width: 350px;
   margin-top: 15px;
 }
@@ -719,7 +719,7 @@ kbd {
 }
 .learning-note > p:not(.eyebrow) {
   font-size: 12px;
-  color: #77735b;
+  color: #65604b;
   line-height: 1.85;
   margin-top: 12px;
   max-width: 295px;
@@ -727,7 +727,7 @@ kbd {
 .note-foot {
   font-size: 8px;
   letter-spacing: 1.2px;
-  color: #9a9479;
+  color: #69634c;
   display: block;
   margin-top: 23px;
 }

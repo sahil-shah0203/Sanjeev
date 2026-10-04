@@ -27,6 +27,7 @@ export default function ContentReview() {
   const [checked, setChecked] = useState(false);
   const [noteId, setNoteId] = useState("");
   const [task, setTask] = useState<Activity["cognitiveTask"]>("recall");
+  const [format, setFormat] = useState<Activity["format"]>("short_answer");
   const [job, setJob] = useState<string | null>(null);
   const notes = useLiveQuery(() => db.notes.toArray(), [db]) ?? [];
   const load = async () => {
@@ -75,7 +76,7 @@ export default function ContentReview() {
       id: id(),
       version: id(),
       objective: "Describe the supported objective",
-      format: "short_answer",
+      format,
       cognitiveTask: task,
       stem: "Write the source-supported prompt",
       acceptedAnswers: [],
@@ -129,7 +130,7 @@ export default function ContentReview() {
       const r = await fetch("/api/generation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteId, task }),
+        body: JSON.stringify({ noteId, task, format }),
       });
       const b = await r.json();
       if (!r.ok) throw new Error(b.error.message);
@@ -219,6 +220,19 @@ export default function ContentReview() {
                     {t}
                   </option>
                 ))}
+              </select>
+              <select
+                aria-label="Question format"
+                value={format}
+                onChange={(e) =>
+                  setFormat(e.target.value as Activity["format"])
+                }
+              >
+                <option value="short_answer">Short answer</option>
+                <option value="multiple_choice">Multiple choice</option>
+                <option value="brief_explanation">
+                  One-sentence explanation
+                </option>
               </select>
               <button
                 className="button primary"

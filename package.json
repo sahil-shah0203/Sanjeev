@@ -11,6 +11,7 @@
     "build": "node scripts/assets.mjs && next build apps/web --webpack && node scripts/build-sw.mjs && node scripts/package-standalone.mjs",
     "start": "node scripts/start-standalone.mjs",
     "typecheck": "tsc --noEmit",
+    "lint": "biome lint . && node scripts/check-secrets.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "format": "prettier --write apps packages tests scripts docs *.json *.ts *.yml",
@@ -38,6 +39,8 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@biomejs/biome": "2.5.15",
     "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.3",
@@ -52,6 +55,7 @@
     "jsdom": "26.1.0",
     "pnpm": "10.34.6",
     "prettier": "3.9.9",
+    "railway": "3.12.0",
     "supabase": "2.119.0",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",

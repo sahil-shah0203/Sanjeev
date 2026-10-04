@@ -5,6 +5,7 @@ export async function enqueueGeneration(
   owner: string,
   noteId: string,
   task: Activity["cognitiveTask"],
+  format: Activity["format"] = "short_answer",
 ) {
   if (process.env.ENABLE_AI_GENERATION !== "true")
     throw new HttpError(
@@ -59,13 +60,18 @@ export async function enqueueGeneration(
         noteId,
         version: note.version,
         task,
+        format,
         prompt: "source-only-1",
         model: process.env.LLM_MODEL ?? "fixture",
       }),
     );
     const result = await db.query(
       "INSERT INTO public.jobs(owner_id,kind,idempotency_key,input,max_attempts) VALUES ($1,'generate',$2,$3,1) ON CONFLICT(owner_id,idempotency_key) DO UPDATE SET idempotency_key=excluded.idempotency_key RETURNING id,status",
-      [owner, key, JSON.stringify({ noteId, version: note.version, task })],
+      [
+        owner,
+        key,
+        JSON.stringify({ noteId, version: note.version, task, format }),
+      ],
     );
     return result.rows[0];
   });

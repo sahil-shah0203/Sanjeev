@@ -29,7 +29,13 @@ import {
 import { clozeCount, oneByOne } from "@recall/card-renderer";
 import { useClock } from "../../features/useClock";
 import { intervalLabel, preview } from "@recall/scheduler";
-import { deterministicGrade, eligibleActivity } from "@recall/learning";
+import { selectActivity } from "@recall/learning";
+import {
+  openIntervention,
+  checkpointIntervention,
+  recoverInterventions,
+  saveAdaptiveAttempt,
+} from "../../features/adaptive";
 import { useLibrary } from "../LibraryProvider";
 import {
   eligibleCards,
@@ -70,6 +76,12 @@ export default function Study() {
   const [activity, setActivity] = useState<Activity | null>(null);
   const [adaptiveAnswer, setAdaptiveAnswer] = useState("");
   const [adaptiveResult, setAdaptiveResult] = useState<Attempt | null>(null);
+  const [intervention, setIntervention] = useState<{
+    id: string;
+    reason: string;
+  } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [helpNotice, setHelpNotice] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
   const exposureId = useRef("");
   const eventId = useRef(id());
@@ -107,6 +119,7 @@ export default function Study() {
       attemptedRef.current = true;
       setTyped("");
       setSourceOpen(false);
+      setHelpNotice("");
       activeMs.current = 0;
       eventId.current = id();
       exposureId.current = "";
@@ -115,8 +128,23 @@ export default function Study() {
     [db, sessionId],
   );
   useEffect(() => {
-    void load().catch((e) => setError(errorMessage(e)));
-  }, [load]);
+    void recoverInterventions(db, sessionId)
+      .then(() => load())
+      .catch((e) => setError(errorMessage(e)));
+  }, [db, sessionId, load]);
+  useEffect(() => {
+    if (!intervention) return;
+    const timer = setInterval(() => {
+      setElapsed(activeMs.current);
+      void checkpointIntervention(
+        db,
+        sessionId,
+        intervention.id,
+        activeMs.current,
+      ).catch((e) => setError(errorMessage(e)));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [db, sessionId, intervention]);
   useEffect(() => {
     if (item || activity || finished || !loaded) return;
     const timer = setInterval(
@@ -213,7 +241,7 @@ export default function Study() {
       const exposures = await db.exposures
         .where("noteId")
         .equals(item.note.id)
-        .filter((e) => Date.parse(e.at) > Date.now() - 30 * 60000)
+        .filter((e) => e.sessionId === session.id || Date.parse(e.at) > Date.now() - 30 * 60000)
         .toArray();
       const contaminated = exposures.some(
         (e) =>
@@ -255,23 +283,47 @@ export default function Study() {
       const updated = await db.sessions.get(session.id);
       if (prefs.adaptive && features.adaptive && updated) {
         const queue = await eligibleCards(db, updated);
-        if (
-          !queue.some(
-            (q) => q.state.memory.state === 1 || q.state.memory.state === 3,
-          )
-        ) {
+        {
           const notes = await db.notes.toArray();
           const recentExposures = await db.exposures
             .where("at")
-            .above(new Date(Date.now() - 30 * 60000).toISOString())
+            .above(
+              new Date(
+                Math.min(
+                  Date.parse(updated.startedAt),
+                  Date.now() - 30 * 60000,
+                ),
+              ).toISOString(),
+            )
             .toArray();
           const exposed = new Set(recentExposures.map((e) => e.noteId));
           exposed.add(item.note.id);
           const candidates = await db.activities.toArray();
-          const candidate = candidates.find((a) =>
-            eligibleActivity(a, updated, notes, exposed, queue.length),
-          );
-          if (candidate) setActivity(candidate);
+          const candidate = selectActivity({
+            session: updated,
+            notes,
+            activities: candidates,
+            exposedNoteIds: exposed,
+            overdue: queue.filter((q) => q.state.memory.reps > 0).length,
+            learningDue: queue.some(
+              (q) => q.state.memory.state === 1 || q.state.memory.state === 3,
+            ),
+            reviews: await db.reviews.toArray(),
+            attempts: await db.attempts.toArray(),
+            at: now(),
+          });
+          if (candidate) {
+            const entry = await openIntervention(
+              db,
+              updated.id,
+              candidate.activity,
+              candidate.reason,
+            );
+            activeMs.current = 0;
+            setElapsed(0);
+            setIntervention(entry);
+            setActivity(candidate.activity);
+          }
         }
       }
     } catch (e) {
@@ -331,55 +383,23 @@ export default function Study() {
     return () => window.removeEventListener("keydown", handler);
   });
   const submitAdaptive = async () => {
-    if (!activity || !session || busy) return;
+    if (!activity || !session || !intervention || busy || locked.current)
+      return;
+    locked.current = true;
     setBusy(true);
     try {
-      const result = deterministicGrade(activity, adaptiveAnswer);
-      const attempt: Attempt = {
-        id: id(),
-        activityId: activity.id,
-        activityVersion: activity.version,
-        sessionId: session.id,
-        answer: adaptiveAnswer,
-        at: now(),
-        durationMs: activeMs.current,
-        assistance: false,
-        contaminated: false,
-        grade: result.grade,
-        feedback: result.feedback,
-      };
-      await db.transaction(
-        "rw",
-        [db.attempts, db.exposures, db.sessions, db.outbox],
-        async () => {
-          await db.attempts.put(attempt);
-          await enqueue(db, "attempts", attempt.id, attempt);
-          for (const ref of activity.sources) {
-            const exposure = {
-              id: id(),
-              cardId: "",
-              noteId: ref.noteId,
-              sessionId: session.id,
-              at: now(),
-              kind: "adaptive" as const,
-              activityId: activity.id,
-            };
-            await db.exposures.put(exposure);
-            await enqueue(db, "exposures", exposure.id, exposure);
-          }
-          await updateSession(db, session.id, {
-            checks: session.checks + 1,
-            interventionMs: session.interventionMs + activeMs.current,
-            teachbacks:
-              session.teachbacks +
-              (activity.format === "brief_explanation" ? 1 : 0),
-          });
-        },
+      const attempt = await saveAdaptiveAttempt(
+        db,
+        session.id,
+        intervention.id,
+        adaptiveAnswer,
+        activeMs.current,
       );
       setAdaptiveResult(attempt);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      locked.current = false;
       setBusy(false);
     }
   };
@@ -387,26 +407,64 @@ export default function Study() {
     if (locked.current) return;
     locked.current = true;
     try {
-      if (activity && session) {
-        const latest = (await db.sessions.get(session.id)) ?? session;
-        await updateSession(db, session.id, {
-          checks: latest.checks + (adaptiveResult ? 0 : 1),
-          interventionMs:
-            latest.interventionMs +
-            Math.max(0, activeMs.current - (adaptiveResult?.durationMs ?? 0)),
-          teachbacks:
-            latest.teachbacks +
-            (!adaptiveResult && activity.format === "brief_explanation"
-              ? 1
-              : 0),
-        });
-      }
+      if (intervention && session)
+        await checkpointIntervention(
+          db,
+          session.id,
+          intervention.id,
+          activeMs.current,
+          adaptiveResult ? "completed" : "dismissed",
+        );
       setActivity(null);
+      setIntervention(null);
       setAdaptiveAnswer("");
       setAdaptiveResult(null);
       activeMs.current = 0;
     } catch (error) {
       setError(errorMessage(error));
+    } finally {
+      locked.current = false;
+    }
+  };
+  const requestHelp = async () => {
+    if (!item || !session || locked.current) return;
+    locked.current = true;
+    try {
+      const candidate = selectActivity({
+        session,
+        notes: await db.notes.toArray(),
+        activities: await db.activities.toArray(),
+        reviews: [],
+        attempts: [],
+        exposedNoteIds: new Set(),
+        overdue: 0,
+        learningDue: false,
+        at: now(),
+        requestedNoteId: item.note.id,
+      });
+      if (candidate) {
+        const entry = await openIntervention(
+          db,
+          session.id,
+          candidate.activity,
+          candidate.reason,
+          true,
+        );
+        activeMs.current = 0;
+        setElapsed(0);
+        setIntervention(entry);
+        setActivity(candidate.activity);
+      } else {
+        await recordExposure(db, item.card, session.id, "source");
+        setRevealed(true);
+        setAttempted(false);
+        attemptedRef.current = false;
+        setHelpNotice(
+          "No reviewed explanation is available for this source. Read the original answer below, edit or report the card if needed, and return to review. This is an exposure, not a recall success.",
+        );
+      }
+    } catch (e) {
+      setError(errorMessage(e));
     } finally {
       locked.current = false;
     }
@@ -487,6 +545,19 @@ export default function Study() {
               OPTIONAL · {activity.cognitiveTask.toUpperCase()}
             </p>
             <h2>{activity.stem}</h2>
+            <p className="muted">
+              {intervention?.reason} Suggested time: {activity.expectedSeconds}{" "}
+              seconds. You can stop at any time.
+            </p>
+            {elapsed >= activity.expectedSeconds * 1000 && (
+              <Notice>
+                You have reached the suggested time. Continue if useful, or
+                return to review; response speed does not affect your grade.
+              </Notice>
+            )}
+            <button className="text-button" onClick={clearActivity}>
+              Return to ordinary review
+            </button>
             {!adaptiveResult ? (
               <>
                 {activity.options ? (
@@ -594,6 +665,16 @@ export default function Study() {
         ) : (
           item && (
             <>
+              {helpNotice && <Notice>{helpNotice}</Notice>}
+              {features.adaptive && (
+                <button
+                  className="text-button"
+                  onClick={requestHelp}
+                  disabled={busy}
+                >
+                  I don’t understand · optional deeper study
+                </button>
+              )}
               {budgetReached && (
                 <Notice>
                   Your planned time is complete.{" "}

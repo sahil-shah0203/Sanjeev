@@ -1,6 +1,10 @@
 node_modules
 **/.next
 .git
+.vercel
+supabase/.temp
+**/.env*
+**/*.apkg
 .local
 .tools
 .env

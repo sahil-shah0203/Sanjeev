@@ -9,10 +9,13 @@ export async function POST(request: Request) {
       .object({
         noteId: z.string().uuid(),
         task: z.enum(["recall", "explain", "discriminate", "apply"]),
+        format: z
+          .enum(["short_answer", "multiple_choice", "brief_explanation"])
+          .default("short_answer"),
       })
       .parse(await body(request, 2048));
     return NextResponse.json(
-      await enqueueGeneration(user.id, input.noteId, input.task),
+      await enqueueGeneration(user.id, input.noteId, input.task, input.format),
       { status: 202 },
     );
   } catch (e) {

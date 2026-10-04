@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { createClient } from "@supabase/supabase-js";
+import { createServer } from "node:http";
 import { id, type Activity, type Note } from "@recall/domain";
 import { modelProvider } from "@recall/ai";
 import { validateActivity } from "@recall/learning";
@@ -11,8 +11,28 @@ try {
 } catch {}
 if (!process.env.DATABASE_URL)
   throw new Error("Set DATABASE_URL in the worker environment or root .env.");
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+});
 let stopping = false;
+let lastContact = 0;
+const health = createServer((_request, response) => {
+  const healthy = !stopping && Date.now() - lastContact < 90000;
+  response.writeHead(healthy ? 200 : 503, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+  });
+  response.end(
+    JSON.stringify({
+      service: "recall-worker",
+      status: healthy ? "ok" : "starting_or_disconnected",
+    }),
+  );
+});
+health.listen(Number(process.env.PORT ?? 3002), "0.0.0.0");
 process.on("SIGINT", () => {
   stopping = true;
 });
@@ -90,17 +110,29 @@ async function execute(job: any) {
     if (!note || note.version !== job.input.version)
       throw new Error("SOURCE_CHANGED");
     await reserveBudget(job.owner_id, job.id);
-    const result = await modelProvider().generate([note], job.input.task);
+    const result = await modelProvider().generate(
+      [note],
+      job.input.task,
+      job.input.format,
+    );
     if (result.activity) {
       const errors = validateActivity(result.activity, [note]);
       if (errors.length) return { abstain: errors.join(" ") };
       const a = { ...result.activity, status: "draft" };
-      await publishWithLease(pool, job, (db) =>
-        db.query(
+      await publishWithLease(pool, job, async (db) => {
+        const current = (
+          await db.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='notes' AND id=$2 AND deleted=false FOR UPDATE",
+            [job.owner_id, note.id],
+          )
+        ).rows[0]?.value;
+        if (current?.version !== note.version)
+          throw new Error("SOURCE_CHANGED");
+        return db.query(
           "INSERT INTO public.documents(owner_id,entity,id,value) VALUES($1,'activities',$2,$3) ON CONFLICT(owner_id,entity,id) DO NOTHING",
           [job.owner_id, a.id, JSON.stringify(a)],
-        ),
-      );
+        );
+      });
       return { activityId: a.id, status: "awaiting_human_review" };
     }
     return result;
@@ -127,19 +159,35 @@ async function execute(job: any) {
         [job.owner_id, attempt?.activityId],
       )
     ).rows[0]?.value as Activity | undefined;
-    if (!attempt || !activity || activity.status !== "human_approved")
+    if (
+      !attempt ||
+      !activity ||
+      activity.status !== "human_approved" ||
+      activity.version !== attempt.activityVersion
+    )
       throw new Error("APPROVED_ACTIVITY_REQUIRED");
     await reserveBudget(job.owner_id, job.id);
     const grade = await modelProvider().grade(
       activity,
       String(attempt.answer).slice(0, 4000),
     );
-    await publishWithLease(pool, job, (db) =>
-      db.query(
+    await publishWithLease(pool, job, async (db) => {
+      const current = (
+        await db.query(
+          "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='activities' AND id=$2 AND deleted=false FOR UPDATE",
+          [job.owner_id, activity.id],
+        )
+      ).rows[0]?.value;
+      if (
+        current?.status !== "human_approved" ||
+        current.version !== activity.version
+      )
+        throw new Error("APPROVED_ACTIVITY_REQUIRED");
+      return db.query(
         "UPDATE public.documents SET value=value || $3::jsonb,row_version=row_version+1,updated_at=now() WHERE owner_id=$1 AND entity='attempts' AND id=$2",
         [job.owner_id, attempt.id, JSON.stringify({ modelGrade: grade })],
-      ),
-    );
+      );
+    });
     return { attemptId: attempt.id, grade };
   }
   if (job.kind === "cleanup") {
@@ -152,51 +200,64 @@ async function execute(job: any) {
 }
 log("worker_ready");
 while (!stopping) {
-  const token = id();
-  const job = (
-    await pool.query("SELECT * FROM public.claim_recall_job($1)", [token])
-  ).rows[0];
-  if (!job) {
-    await pool.query(
-      "UPDATE public.jobs SET status='failed',error_code='LEASE_RETRIES_EXHAUSTED',updated_at=now() WHERE status='running' AND lease_until<now() AND attempts>=max_attempts",
-    );
-    await pool.query(
-      "UPDATE public.jobs SET status='cancelled',updated_at=now() WHERE status='cancel_requested' AND (lease_until IS NULL OR lease_until<now())",
-    );
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    continue;
-  }
-  log("job_started", { job: job.id, kind: job.kind });
-  const heartbeat = setInterval(
-    () =>
-      void pool
-        .query(
-          "UPDATE public.jobs SET heartbeat_at=now(),lease_until=now()+interval '60 seconds' WHERE id=$1 AND lease_token=$2 AND status='running'",
-          [job.id, token],
-        )
-        .catch(() => log("heartbeat_failed", { job: job.id })),
-    15000,
-  );
   try {
-    const output = await execute(job);
-    await pool.query(
-      "UPDATE public.jobs SET status=CASE WHEN status='cancel_requested' THEN 'cancelled' ELSE 'succeeded' END,output=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2",
-      [job.id, token, JSON.stringify(output)],
+    const token = id();
+    const job = (
+      await pool.query("SELECT * FROM public.claim_recall_job($1)", [token])
+    ).rows[0];
+    lastContact = Date.now();
+    if (!job) {
+      await pool.query(
+        "UPDATE public.jobs SET status='failed',error_code='LEASE_RETRIES_EXHAUSTED',updated_at=now() WHERE status='running' AND lease_until<now() AND attempts>=max_attempts",
+      );
+      await pool.query(
+        "UPDATE public.jobs SET status='cancelled',updated_at=now() WHERE status='cancel_requested' AND (lease_until IS NULL OR lease_until<now())",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      continue;
+    }
+    log("job_started", { job: job.id, kind: job.kind });
+    const heartbeat = setInterval(
+      () =>
+        void pool
+          .query(
+            "UPDATE public.jobs SET heartbeat_at=now(),lease_until=now()+interval '60 seconds' WHERE id=$1 AND lease_token=$2 AND status='running'",
+            [job.id, token],
+          )
+          .catch(() => log("heartbeat_failed", { job: job.id })),
+      15000,
     );
-    log("job_finished", { job: job.id });
-  } catch (e) {
+    try {
+      const output = await execute(job);
+      await pool.query(
+        "UPDATE public.jobs SET status=CASE WHEN status='cancel_requested' THEN 'cancelled' ELSE 'succeeded' END,output=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2",
+        [job.id, token, JSON.stringify(output)],
+      );
+      log("job_finished", { job: job.id });
+    } catch (e) {
+      const code =
+        e instanceof Error && /^[A-Z_]+$/.test(e.message)
+          ? e.message
+          : "JOB_FAILED";
+      await pool.query(
+        "UPDATE public.jobs SET status=CASE WHEN status='cancel_requested' OR $3='CANCELLED' THEN 'cancelled' ELSE 'failed' END,error_code=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2",
+        [job.id, token, code],
+      );
+      log("job_failed", { job: job.id, code });
+    } finally {
+      clearInterval(heartbeat);
+    }
+  } catch (error) {
     const code =
-      e instanceof Error && /^[A-Z_]+$/.test(e.message)
-        ? e.message
-        : "JOB_FAILED";
-    await pool.query(
-      "UPDATE public.jobs SET status=CASE WHEN status='cancel_requested' OR $3='CANCELLED' THEN 'cancelled' ELSE 'failed' END,error_code=$3,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2",
-      [job.id, token, code],
-    );
-    log("job_failed", { job: job.id, code });
-  } finally {
-    clearInterval(heartbeat);
+      error && typeof error === "object" && "code" in error
+        ? String(error.code)
+        : "UNKNOWN";
+    log("database_unavailable", {
+      code: /^[A-Z0-9_]{1,40}$/.test(code) ? code : "UNKNOWN",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
 }
+health.close();
 await pool.end();
 log("worker_stopped");

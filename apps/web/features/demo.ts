@@ -1,4 +1,5 @@
 import { hash, id, now, type ImportBundle } from "@recall/domain";
+import { POLYGON_SOURCE } from "../../../packages/learning/src/synthetic";
 export async function demoBundle(): Promise<ImportBundle> {
   const namespace = "c2efc31b-40b0-42b8-ab94-6f03b4cd2b80",
     importId = id(),
@@ -19,10 +20,16 @@ export async function demoBundle(): Promise<ImportBundle> {
       originalId: String(1700000000000 + i),
       guid: `recall-demo-${i}`,
       typeId,
-      fields: [text, "Synthetic demonstration card."],
+      fields: [
+        text,
+        i === 0 ? POLYGON_SOURCE : "Synthetic demonstration card.",
+      ],
       tags: ["Recall::Demo"],
       version: await hash(
-        JSON.stringify([text, "Synthetic demonstration card."]),
+        JSON.stringify([
+          text,
+          i === 0 ? POLYGON_SOURCE : "Synthetic demonstration card.",
+        ]),
       ),
       raw: {},
       revisions: [],

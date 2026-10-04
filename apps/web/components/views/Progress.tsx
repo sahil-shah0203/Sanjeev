@@ -11,6 +11,7 @@ export default function Progress() {
   const reviews = useLiveQuery(() => db.reviews.toArray(), [db]) ?? [];
   const attempts = useLiveQuery(() => db.attempts.toArray(), [db]) ?? [];
   const activities = useLiveQuery(() => db.activities.toArray(), [db]) ?? [];
+  const exposures = useLiveQuery(() => db.exposures.count(), [db]) ?? 0;
   const valid = reviews.filter(
     (r) => r.status !== "undone" && r.status !== "concurrent",
   );
@@ -106,11 +107,33 @@ export default function Progress() {
                     ? "Explanation"
                     : e.dimension === "discriminate"
                       ? "Discrimination"
-                      : "Alternate recall"}
+                      : e.dimension === "recognition"
+                        ? "Recognition (multiple choice)"
+                        : "Alternate unaided recall"}
               </span>
               <strong>{e.observations} observations</strong>
             </div>
           ))}
+          <div>
+            <span>Assisted practice</span>
+            <strong>
+              {attempts.filter((a) => a.assistance).length} attempts
+            </strong>
+          </div>
+          <div>
+            <span>Recorded exposures</span>
+            <strong>{exposures}</strong>
+          </div>
+          <div>
+            <span>Uncertain or disputed</span>
+            <strong>
+              {
+                attempts.filter((a) => a.grade === "uncertain" || a.dispute)
+                  .length
+              }{" "}
+              attempts
+            </strong>
+          </div>
         </div>
       </section>
       <Notice>

@@ -119,7 +119,9 @@ function template(
     const key = m[1].trim();
     if (key[0] === "#" || key[0] === "^") {
       const name = key.slice(1);
-      const present = !!stripHtml(values[name] ?? "");
+      const present =
+        !!stripHtml(values[name] ?? "") ||
+        /<(?:img|audio|video)\b|\[sound:/i.test(values[name] ?? "");
       stack.push({ name, visible: key[0] === "#" ? present : !present });
       continue;
     }

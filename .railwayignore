@@ -1,0 +1,14 @@
+.git
+.vercel
+.env
+.env.*
+**/.env*
+**/*.apkg
+node_modules
+**/.next
+*.apkg
+*.recall
+.local
+supabase/.temp
+test-results
+playwright-report

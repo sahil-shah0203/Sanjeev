@@ -1,7 +1,10 @@
 .env
 .env.*
 !.env.example
-forsahil.apkg
+*.apkg
+**/*.apkg
+**/.env*
+supabase/.temp
 *.recall
 node_modules
 .next

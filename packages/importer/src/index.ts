@@ -11,7 +11,7 @@ import {
   type Raw,
 } from "@recall/domain";
 import { protobuf, protoText, protoNum } from "./protobuf";
-import { compatibility } from "@recall/card-renderer";
+import { compatibility, renderCard } from "@recall/card-renderer";
 
 export const LIMITS = {
   package: 512 * 1024 ** 2,
@@ -473,35 +473,34 @@ export async function parsePackage(
       if (options.onMedia) await options.onMedia(asset);
       else media.push(asset);
     }
-    for (const n of notes)
-      for (const field of n.fields) {
-        const regex =
-          /<(?:img|audio|source|video)\b[^>]*\bsrc\s*=\s*["']([^"']+)["']|\[sound:([^\]]+)\]/gi;
-        let match: RegExpExecArray | null;
-        while ((match = regex.exec(field))) {
-          let name = (match[1] ?? match[2]).replace(/&amp;/g, "&");
-          try {
-            name = decodeURIComponent(name);
-          } catch {}
-          if (
-            !/^(?:https?:|data:|blob:)/i.test(name) &&
-            !names.has(name) &&
-            !missingMedia.includes(name)
-          )
-            missingMedia.push(name);
-        }
+    for (const field of [
+      ...notes.flatMap((n) => n.fields),
+      ...types.flatMap((t) => t.templates.flatMap((v) => [v.front, v.back])),
+    ]) {
+      const regex =
+        /<(?:img|audio|source|video)\b[^>]*\bsrc\s*=\s*["']([^"']+)["']|\[sound:([^\]]+)\]/gi;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(field))) {
+        let name = (match[1] ?? match[2]).replace(/&amp;/g, "&");
+        try {
+          name = decodeURIComponent(name);
+        } catch {}
+        if (
+          !/^(?:https?:|data:|blob:)/i.test(name) &&
+          !names.has(name) &&
+          !missingMedia.includes(name)
+        )
+          missingMedia.push(name);
       }
+    }
     for (const c of cards) {
       const n = notesById.get(c.noteId)!;
       const t = typesById.get(n.typeId)!;
+      if (!c.supported) continue;
       const questionFields =
-        t.kind === "cloze"
-          ? [n.fields[0]]
-          : n.fields.filter((_, i) =>
-              t.templates
-                .find((x) => x.ord === c.ord)
-                ?.front.includes(t.fields[i]),
-            );
+        t.kind === "occlusion"
+          ? [n.fields[1]]
+          : [renderCard(t, n, c.ord, false).html];
       if (
         questionFields.some((f) => missingMedia.some((m) => f?.includes(m)))
       ) {

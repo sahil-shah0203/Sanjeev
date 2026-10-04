@@ -5,13 +5,15 @@ type Row = {
   tags: string[];
   deckId: string;
   status: string;
+  searchText?: string;
 };
 let rows: Row[] = [];
 self.onmessage = (e: MessageEvent) => {
   if (e.data.kind === "index") {
     rows = e.data.rows.map((r: Row) => ({
       ...r,
-      text: stripHtml(r.text).toLocaleLowerCase(),
+      searchText:
+        `${stripHtml(r.text)} ${r.tags.join(" ")}`.toLocaleLowerCase(),
     }));
     return;
   }
@@ -21,9 +23,7 @@ self.onmessage = (e: MessageEvent) => {
     (r) =>
       (!deckId || r.deckId === deckId) &&
       (!status || r.status === status) &&
-      terms.every((t) =>
-        `${r.text} ${r.tags.join(" ").toLocaleLowerCase()}`.includes(t),
-      ),
+      terms.every((t) => r.searchText!.includes(t)),
   );
   postMessage({
     requestId,

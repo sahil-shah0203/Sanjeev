@@ -196,6 +196,19 @@ export interface StudySession {
   completed: boolean;
   seed: string;
   policy: string;
+  interventions?: Intervention[];
+}
+export interface Intervention {
+  id: string;
+  activityId: string;
+  activityVersion: string;
+  reason: string;
+  policy: string;
+  startedAt: string;
+  durationMs: number;
+  expectedMs: number;
+  requested: boolean;
+  status: "open" | "completed" | "dismissed" | "interrupted";
 }
 export interface Preferences {
   id: "preferences";
@@ -290,6 +303,11 @@ export interface Attempt {
   feedback: string;
   dispute?: string;
   adjudication?: string;
+  format?: Activity["format"];
+  cognitiveTask?: Activity["cognitiveTask"];
+  objective?: string;
+  selectionReason?: string;
+  policy?: string;
 }
 export interface ContentReport {
   id: string;
@@ -522,6 +540,22 @@ export const recordSchemas = {
     completed: z.boolean(),
     seed: key,
     policy: key,
+    interventions: z
+      .array(
+        z.object({
+          id: key,
+          activityId: key,
+          activityVersion: key,
+          reason: z.string(),
+          policy: key,
+          startedAt: stamp,
+          durationMs: z.number().nonnegative(),
+          expectedMs: z.number().nonnegative(),
+          requested: z.boolean(),
+          status: z.enum(["open", "completed", "dismissed", "interrupted"]),
+        }),
+      )
+      .optional(),
   }),
   attempts: z
     .object({

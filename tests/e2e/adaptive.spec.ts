@@ -26,7 +26,15 @@ test("approved synthetic check supports uncertainty and self-check without extra
         request.onerror = () => reject(request.error);
       });
     const tx = db.transaction(
-      ["notes", "preferences", "sessions", "activities"],
+      [
+        "notes",
+        "preferences",
+        "sessions",
+        "activities",
+        "reviews",
+        "states",
+        "cards",
+      ],
       "readwrite",
     );
     const finished = new Promise<void>((resolve, reject) => {
@@ -35,6 +43,32 @@ test("approved synthetic check supports uncertainty and self-check without extra
     });
     const notes = await read(tx.objectStore("notes").getAll());
     const source = notes.find((n) => n.guid === "recall-demo-5");
+    const cards = await read(tx.objectStore("cards").getAll());
+    const card = cards.find((c) => c.noteId === source.id);
+    const state = await read(tx.objectStore("states").get(card.id));
+    for (const daysAgo of [1, 2]) {
+      const date = new Date(Date.now() - daysAgo * 86400000);
+      tx.objectStore("reviews").put({
+        id: crypto.randomUUID(),
+        cardId: card.id,
+        noteId: source.id,
+        sessionId,
+        deviceId: "synthetic-test",
+        sequence: daysAgo,
+        parent: null,
+        baseVersion: 0,
+        before: state,
+        after: state,
+        config: state.config,
+        contentVersion: source.version,
+        durationMs: 2000,
+        status: "canonical",
+        rating: "again",
+        at: date.toISOString(),
+        effectiveAt: date.toISOString(),
+        studyDay: date.toISOString().slice(0, 10),
+      });
+    }
     const session = await read(tx.objectStore("sessions").get(sessionId));
     tx.objectStore("sessions").put({ ...session, reviews: 9 });
     tx.objectStore("preferences").put({
@@ -112,7 +146,7 @@ test("approved synthetic check supports uncertainty and self-check without extra
     db.close();
     return { reviews, attempts };
   });
-  expect(counts.reviews).toBe(1);
+  expect(counts.reviews).toBe(3);
   expect(counts.attempts).toHaveLength(1);
   expect(counts.attempts[0]).toMatchObject({
     grade: "uncertain",

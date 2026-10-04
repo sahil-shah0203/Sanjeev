@@ -113,6 +113,15 @@ export default function CardContent({
         onClick={(e) => {
           if (e.target instanceof HTMLImageElement) setZoom(e.target.src);
         }}
+        onKeyDown={(e) => {
+          if (
+            e.target instanceof HTMLImageElement &&
+            (e.key === "Enter" || e.key === " ")
+          ) {
+            e.preventDefault();
+            setZoom(e.target.src);
+          }
+        }}
       >
         <div
           data-testid="card-face"
@@ -137,16 +146,25 @@ export default function CardContent({
           </div>
         )}
       </div>
-      {revealed &&
-        type.kind !== "occlusion" &&
-        assets?.some((a) => a.mime.startsWith("image/")) && (
-          <button
-            className="text-button image-open"
-            onClick={() => setZoom(urls.values().next().value ?? null)}
-          >
-            Open image viewer
-          </button>
-        )}
+      {type.kind !== "occlusion" &&
+        [...urls]
+          .filter(([name]) =>
+            assets?.some((a) => a.name === name && a.mime.startsWith("image/")),
+          )
+          .filter(
+            ([, url]) =>
+              output.html.includes(url) ||
+              (revealed && output.extras.some((e) => e.html.includes(url))),
+          )
+          .map(([name, url]) => (
+            <button
+              key={name}
+              className="text-button image-open"
+              onClick={() => setZoom(url)}
+            >
+              Open image viewer: {name}
+            </button>
+          ))}
       <dialog
         ref={dialog}
         className="image-dialog"

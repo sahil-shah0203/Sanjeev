@@ -22,6 +22,8 @@ Node recommended: 22.12+; exercised locally: 22.11.0 on Windows. Package manager
 | sql.js | 1.14.2 | MIT | Runtime |
 | ts-fsrs | 5.4.2 | MIT | Runtime |
 | zod | 4.6.5 | MIT | Runtime |
+| @axe-core/playwright | 4.13.0 | MPL-2.0 | Development |
+| @biomejs/biome | 2.5.15 | MIT OR Apache-2.0 | Development |
 | @electric-sql/pglite | 0.5.8 | Apache-2.0 | Development |
 | @playwright/test | 1.63.0 | Apache-2.0 | Development |
 | @tailwindcss/postcss | 4.3.3 | MIT | Development |
@@ -36,6 +38,7 @@ Node recommended: 22.12+; exercised locally: 22.11.0 on Windows. Package manager
 | jsdom | 26.1.0 | MIT | Development |
 | pnpm | 10.34.6 | MIT | Development |
 | prettier | 3.9.9 | MIT | Development |
+| railway | 3.12.0 | MIT | Development |
 | supabase | 2.119.0 | MIT | Development |
 | tailwindcss | 4.3.3 | MIT | Development |
 | tsx | 4.23.15 | MIT | Development |
