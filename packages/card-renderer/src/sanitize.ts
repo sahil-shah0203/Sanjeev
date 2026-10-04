@@ -97,6 +97,15 @@ export function safeHtml(
       if (el.tagName === "IMG") {
         el.setAttribute("loading", "lazy");
         el.setAttribute("decoding", "async");
+        el.setAttribute("tabindex", "0");
+        el.setAttribute("role", "button");
+        const description = el.getAttribute("alt")?.trim();
+        el.setAttribute(
+          "aria-label",
+          description
+            ? `Open image viewer: ${description}`
+            : "Open image viewer",
+        );
       } else if (el.tagName !== "SOURCE") {
         el.setAttribute("controls", "");
         el.setAttribute("preload", "none");

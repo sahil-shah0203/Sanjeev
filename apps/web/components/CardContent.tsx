@@ -146,25 +146,6 @@ export default function CardContent({
           </div>
         )}
       </div>
-      {type.kind !== "occlusion" &&
-        [...urls]
-          .filter(([name]) =>
-            assets?.some((a) => a.name === name && a.mime.startsWith("image/")),
-          )
-          .filter(
-            ([, url]) =>
-              output.html.includes(url) ||
-              (revealed && output.extras.some((e) => e.html.includes(url))),
-          )
-          .map(([name, url]) => (
-            <button
-              key={name}
-              className="text-button image-open"
-              onClick={() => setZoom(url)}
-            >
-              Open image viewer: {name}
-            </button>
-          ))}
       <dialog
         ref={dialog}
         className="image-dialog"

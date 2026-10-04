@@ -1398,6 +1398,10 @@ dialog::backdrop {
   background: #fff;
   border-radius: 3px;
 }
+.card-content img:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
 .card-content audio,
 .card-content video {
   max-width: 100%;
