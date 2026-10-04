@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { Pool } from "pg";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { demoBundle } from "../apps/web/features/demo";
 import { ankiContent } from "@recall/exporter";
@@ -89,7 +90,10 @@ try {
     noteId: n.id,
   }));
   bundle.report = { ...bundle.report, notes: 12, cards: 12, ready: 12 };
-  const archive = await ankiContent(bundle);
+  const archive = await ankiContent(
+    bundle,
+    path.resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
+  );
   await page.goto(`${origin}/import`);
   await page.getByLabel("Choose Anki package").setInputFiles({
     name: "synthetic-source-practice.apkg",

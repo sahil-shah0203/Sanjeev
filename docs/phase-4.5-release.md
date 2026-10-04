@@ -33,7 +33,11 @@ Generation runs in the background. Failure, abstention, quotas or lack of a fitt
 
 ## Verification
 
-Implementation checks and hosted results will be recorded here before release. Relevant suites include `tests/source-practice.test.ts`, the PostgreSQL sync/job/RLS integration tests, and `tests/e2e/phase45.spec.ts`. Existing import, rendering, native restore, keyboard, offline and accessibility journeys remain required.
+Recorded 2026-10-04. Strict TypeScript, Biome and the tracked-file secret guard passed. All 52 unit/integration tests across 12 files passed, including source compilation/tampering/stale versions, abstention, consent, quotas, owner isolation, idempotency, backup quarantine and the FSRS boundary. PostgreSQL tests use PGlite; browser persistence tests use fake-indexeddb.
+
+The production build and standalone packaging passed. Eight Chromium journeys passed locally: private sample import/review/native restore, editing/undo/mobile, offline study/reload, approved synthetic practice, the new navigation, source-only self-check/reporting, public modern import/media/restore, and accessibility. Automated WCAG checks cover desktop/mobile core pages and dark-mode Today/Settings/Account/Help. The optional 50,000-card performance journey was not rerun in this iteration; its baseline measurements remain in `verification.md`.
+
+Hosted results are recorded after deploying this release. Synthetic fixtures exercise the cloud; private sample content remains in its isolated guest browser and is excluded from uploads to Git/deployment services.
 
 ## Friend testing
 

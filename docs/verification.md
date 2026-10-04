@@ -1,5 +1,7 @@
 # Phase 4 beta verification
 
+This page records the original Phase 4 baseline. [Phase 4.5 release evidence](phase-4.5-release.md) supersedes its interface and AI-delivery descriptions: bounded source transformations now have a separate unverified state, while broader generated drafts remain reviewer-gated.
+
 Recorded 2026-10-03/04. This is technical evidence for the supported compatibility subset, not medical approval, proof of educational benefit, or universal Anki compatibility. Phase 5/6 expansion is excluded.
 
 ## Automated and hosted evidence

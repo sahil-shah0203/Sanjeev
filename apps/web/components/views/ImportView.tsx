@@ -424,19 +424,6 @@ export default function ImportView() {
               )}
             </>
           )}
-          <div className="import-help">
-            <h3>A few things to know</h3>
-            <p>
-              Basic and supported cloze cards work here, including the supplied
-              AnKing pattern. Cards that require unsupported templates are
-              preserved and listed for review.
-            </p>
-            <p>
-              Imports stay private. Accounts and cloud recovery are optional.
-              Export a native backup in Settings to keep a copy of your
-              progress.
-            </p>
-          </div>
         </>
       )}
     </>

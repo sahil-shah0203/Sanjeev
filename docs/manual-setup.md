@@ -57,7 +57,7 @@ The live web app uses Vercel, and Railway runs `Dockerfile.worker` using `.railw
 
 ## 4. Optional source-only practice and reviewed drafts
 
-Ordinary review works with all AI flags false. The deployed Phase 4.5 pilot uses `ENABLE_SOURCE_PRACTICE=true` on web and worker, plus `ENABLE_ADAPTIVE_PRACTICE` and `ENABLE_AI_GENERATION` on web. A signed-in learner chooses **AI-generated questions based on your deck** on Today before a timed session. The switch starts off each session. Expect at most one extra exercise after ten original reviews, subject to time and source eligibility. No Settings AI checkboxes are needed. [Exact scope and limits](phase-4.5-release.md) explain the source-only compiler, provider disclosure, self-check and quarantine. Set `ENABLE_SOURCE_PRACTICE=false` to disable this pilot.
+Ordinary review works with all AI flags false. The deployed Phase 4.5 pilot uses `ENABLE_SOURCE_PRACTICE=true` on web and worker, plus `ENABLE_ADAPTIVE_PRACTICE` and `ENABLE_AI_GENERATION` on web. A signed-in learner chooses **Add AI-generated questions** on Today before a timed session. The switch starts off each session. Expect at most one extra exercise after ten original reviews, subject to time and source eligibility. No Settings AI checkboxes are needed. [Exact scope and limits](phase-4.5-release.md) explain the source-only compiler, provider disclosure, self-check and quarantine. Set `ENABLE_SOURCE_PRACTICE=false` to disable this pilot.
 
 For broader reviewer-authored/generated drafts, the protected `/review-content` workflow remains separate:
 
