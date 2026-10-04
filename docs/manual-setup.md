@@ -2,6 +2,20 @@
 
 The app can already run locally without an account or API key. These tasks concern services, credentials, content review, and release evidence that require your accounts or real users.
 
+## Current deployment and remaining actions
+
+The web app is deployed at **https://recall-sepia-seven.vercel.app**. Supabase is configured and both migrations are applied. Railway project **recall-beta**, service **recall-worker**, is deployed; its health endpoint is https://recall-worker-production-60b6.up.railway.app/healthz. You do not need to recreate these services or reinstall their CLIs.
+
+Owner actions still needed:
+
+- In Supabase Auth, verify Site URL is the beta URL above and Redirect URLs includes `https://recall-sepia-seven.vercel.app/auth/callback`. Configure custom SMTP before inviting friends: development email restrictions can prevent delivery to other addresses. Complete one real hosted email-link sign-in yourself.
+- Rotate the Supabase secret key, OpenAI API key and database password that had been placed in `.env.example`. GitHub rejected that initial push; the published baseline was sanitized. Update the ignored local environment files and the Vercel/Railway secret stores, then redeploy. Never paste these values into tracked files. The new secret guard runs in lint/CI.
+- Assign a qualified reviewer before studying generated medical content. No reviewer was invented or assigned medical authority automatically. The assignment SQL is in `operations.md`.
+- Choose backup retention and test your Supabase database plus Storage restore procedure. Native app backup/restore does not substitute for an operator recovery drill.
+- Use `beta-testing.md` for friend testing on actual phones, personal histories and representative decks. Their clinical/content review and educational evaluation cannot be completed by automated tests.
+
+The remaining sections explain setup for a fresh checkout or a separate staging project.
+
 ## 1. Try your local app
 
 Run `npm run dev` and open `http://localhost:3000`, or use `npm run build` followed by `npm run start` to test offline mode. Import `forsahil.apkg`. Its three cards are **suspended in the source export**: select **Resume suspended cards on import** if you want to study them immediately. Their suspension is preserved by default.
@@ -39,16 +53,16 @@ docker compose --profile cloud up --build -d
 
 The first command starts the app; the second also runs the persistent worker. Put the web service behind HTTPS. A normal Node host can use `npm run build` / `npm run start`, with `npm run worker` supervised separately. Do not place the worker in a short-lived HTTP function.
 
-No site has been publicly deployed, no accounts created, and no paid model requests made during this build. Docker configuration is provided but was not executed here.
+The live web app uses Vercel, and Railway runs `Dockerfile.worker` using `.railway/railway.ts`. Temporary synthetic smoke accounts exercise hosted Auth/Storage and are removed after each run. The alternative Docker Compose web stack remains untested locally; see `verification.md` for measured deployment evidence.
 
 ## 4. Enable reviewed practice only when ready
 
-Keep both feature flags false for ordinary review. For a controlled pilot:
+Ordinary review works with both flags false. The beta exposes opt-in practice and generation controls; no generated medical activity is eligible until reviewed. For a controlled pilot:
 
 1. Assign a qualified reviewer to each collection. Use the SQL template in [operations](operations.md); this is an administrator action, not a browser permission.
 2. Turn on `ENABLE_ADAPTIVE_PRACTICE=true` on the web service once approved activities exist. A learner must also opt in from Settings.
 3. Reviewers can author drafts through **Write a draft** without a model. For generation, verify the chosen provider/model's current availability, token prices, privacy/retention terms, and your intended data use. Set `LLM_PROVIDER=openai`, `LLM_MODEL`, `LLM_API_KEY`, the two per-million token prices, and a positive daily spend limit on the worker. Enable `ENABLE_AI_GENERATION=true` on web and worker.
-4. Sign in, consent to selected-source processing, select one source note, and request a draft. Use `LLM_PROVIDER=fixture` to test only synthetic demo recall without paid calls; it abstains on medical sources.
+4. Sign in, consent to selected-source processing, select one source note, and request a draft. `LLM_PROVIDER=fixture` supports all task/format combinations for the authored polygon example and simple recall for the remaining synthetic demo facts; it abstains on medical sources. Live model availability and results are recorded in `verification.md`.
 5. The assigned reviewer checks fidelity **and** medical correctness/currentness, edits the item, supplies the answer/rationale/rubric, and approves it. All cognitive tasks are review-gated. Reporting or source changes quarantine practice.
 
 ## 5. Complete the live release checks

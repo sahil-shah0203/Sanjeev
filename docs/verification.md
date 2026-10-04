@@ -1,62 +1,56 @@
-# Verification and remaining release gates
+# Phase 4 beta verification
 
-Recorded 2026-10-03. This is evidence for the technical alpha, not certification of every Anki format or a medical learning outcome.
+Recorded 2026-10-03/04. This is technical evidence for the supported compatibility subset, not medical approval, proof of educational benefit, or universal Anki compatibility. Phase 5/6 expansion is excluded.
 
-## Completed automated checks
+## Automated and hosted evidence
 
-| Check                   | Result / scope                                                                                                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TypeScript strict check | Passed                                                                                                                                                                                                 |
-| Vitest                  | 36 tests across 8 files passed                                                                                                                                                                         |
-| Production build        | Next.js 16.3.8 webpack build, standalone server and versioned offline shell passed                                                                                                                     |
-| Chromium journeys       | 4 production journeys passed: sample/import/review/reload/backup/restore; mobile edit/undo/no-attempt; offline study reload/save; approved adaptive self-check with unchanged original-card scheduling |
-| Private sample          | 3 notes, 3 cards, 50 media, no missing refs, 0 revlogs; source suspension preserved unless explicitly resumed                                                                                          |
-| Dependency audit        | 0 known vulnerabilities reported by `npm audit` after updating Vitest to 4.1.11                                                                                                                        |
-| Native restore          | Fresh-profile restore, integrity tamper rejection, overwrite protection, archived cloud history without replay                                                                                         |
-| Server reconciliation   | Actual push/pull code on embedded PostgreSQL, duplicate receipts, owner isolation, concurrent offline branches, undo and malformed/forged payload rejection                                            |
-| SQL authorization       | Migrations applied to embedded PostgreSQL with Supabase-compatible Auth/Storage stubs; owner RLS, storage paths, reference checks, browser-write bypass rejection                                      |
-| Worker lifecycle        | Lease claim, cancellation, wrong/expired lease publication rejection, no automatic paid retry                                                                                                          |
-| Migration/source update | Complete synthetic history replay, DST due dates, unsupported-history rejection, source conflicts, missing-from-subset retention, state preservation                                                   |
+| Check                     | Result and scope                                                                                                                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type checking and lint    | Strict TypeScript and Biome passed. Lint includes a tracked-file secret/private-deck guard; CI runs both.                                                                                                                                                                                                        |
+| Unit/integration          | 47 tests across 11 files passed. PostgreSQL uses PGlite with local Auth/Storage stubs; persistence uses fake-indexeddb.                                                                                                                                                                                          |
+| Build                     | Next.js 16.3.8 webpack production build and standalone packaging passed locally and on Vercel.                                                                                                                                                                                                                   |
+| Local production browser  | Seven Chromium journeys passed: private sample, mobile editing/undo/exposures, offline recovery, approved synthetic adaptive check, 50,000-card search, public modern import/restore, accessibility.                                                                                                             |
+| Public deployment browser | All seven Chromium journeys passed on the final Vercel release, including import/review/native restore, offline recovery, synthetic adaptive practice, mobile/desktop accessibility and 50,000-card search. Private sample content stayed in the isolated guest browser.                                         |
+| Live cloud                | Synthetic Auth accounts: guest import plus review migrated; second browser downloaded matching state/head/media; an offline review survived reload and arrived once on the first browser; another account could not read documents or request media. Test accounts/media were removed afterward; no emails sent. |
+| Live worker               | Railway Docker worker is healthy through Supabase's session pooler. Both fixture and real `openai:gpt-6-luna` jobs completed once on duplicate submission, produced source-linked drafts, and rejected approval from unassigned accounts. Temporary accounts/media were removed.                                 |
+| Live model                | Two direct requests using authored nonmedical polygon facts: the first safely failed validation for a missing essential rubric; after clarifying the prompt, GPT-6 Luna returned a validated multiple-choice comparison draft. No medical activity was activated.                                                |
+| Private sample            | 3 notes/cards, 50 media, zero missing references/history rows. Suspension preserved unless explicitly resumed. Private content excluded from Git and deployment uploads.                                                                                                                                         |
+| Data safety               | Forced outbox failure rolls back the review, FSRS state, sequence and session; retry commits once. Backup integrity/reference validation, overwrite protection and guest partitioning pass.                                                                                                                      |
+| Sync/RLS                  | Real push/pull handlers cover receipt payload identity, duplicate events, concurrent branches, undo, owner isolation and forged writes. Pull interruption retries when guest copying adds pending work. Hosted owner/media isolation also checked.                                                               |
+| Hostile content           | Bounded ZIP/Zstandard/protobuf, traversal, duplicate entries, truncation/expansion bombs, orphan metadata, missing prompt media, script/HTML sanitization and source validation.                                                                                                                                 |
+| Adaptive                  | Distinct-day triggers, deterministic rotation, time/count/teach-back limits, learning priority, exposures, recognition separation, idempotent attempts and interrupted-check recovery. Adaptive persistence never writes FSRS state.                                                                             |
+| Dependencies              | `npm audit` reported zero known vulnerabilities. Exact versions/license notices recorded separately.                                                                                                                                                                                                             |
 
-The in-app Browser tool could not initialize because its sandbox metadata was unavailable. Automated Playwright Chromium was installed and used instead. Desktop and mobile screenshots were visually inspected. This does not substitute for real iOS/Android devices or screen-reader testing.
+Live tests found and fixed two deployment-specific failures. Vercel initially captured the previous service worker before the post-build script ran; generation now uses the Next compiler lifecycle before asset collection. Guest copying could add work during an automatic pull; that condition now triggers a bounded retry rather than a misleading migration error.
 
-## Performance observation
+## Performance
 
-`npm run test:performance` generated, exported and reimported 10,000 distinct synthetic text-only cards through the actual archive/parser path. On Windows 10.0.26100, Node 22.11.0, AMD Ryzen 9 5900HS (16 logical CPUs), approximately 15 GiB RAM:
+Windows 10.0.26100, AMD Ryzen 9 5900HS, 16 logical CPUs, about 15 GiB RAM, Node 22.11.0:
 
-- 0.18 MiB compressed package.
-- 3,462 ms content export; 1,992 ms import.
-- Process RSS snapshots: 191 MiB before import, 234 MiB after.
-- All 10,000 card identities remained playable.
+- 50,000 authored text-only cards exported/reimported through the actual archive/parser path; every card remained playable.
+- 0.90 MiB package; export 16,625 ms; import 10,299 ms.
+- Process RSS snapshots: 260 MiB before import, 516 MiB after. These are not peak measurements.
+- Actual Chromium IndexedDB/worker Browse with 50,000 cards: local initial load/index 2,320 ms and search 83 ms; hosted run 2,337 ms and 75 ms. DOM remains paged at 50.
 
-These are one-run Node measurements. RSS snapshots are not peak memory. They do not measure browser commit/search latency, media-heavy collections, low-memory phones, or a maximum supported deck size. `PERF_CARDS` accepts up to 50,000 for larger local trials. Raw output is in the ignored `test-results/performance.json` when generated.
+These are single desktop runs, not mobile/media-heavy limits. Public fixtures contain synthetic text and an authored PNG; private-sample tests are separate.
 
-## Test environment
+## Deployment
 
-Local browser: Playwright 1.63.0 Chromium 153.0.8010.12 (headless), desktop 1280×720 and mobile viewport 390×844. IndexedDB unit persistence tests use fake-indexeddb; browser journeys use actual Chromium IndexedDB. SQL tests use PGlite's actual PostgreSQL engine with local Auth/Storage schema stubs, not hosted Supabase services. No live provider API call is counted as tested.
+- Web: https://recall-sepia-seven.vercel.app — public Vercel beta.
+- Verified Vercel deployment: `dpl_7qzyPGw1CDrj5DWMQSbtBcx4zchE` (2026-10-04 UTC).
+- Worker: https://recall-worker-production-60b6.up.railway.app/healthz — Railway `recall-beta` / `recall-worker`.
+- Supabase: both migrations applied; Auth, private `recall-media` Storage, documents, receipts, jobs, reviewer scopes and RLS configured.
+- Web flags expose opt-in adaptive/generation controls. All generated tasks require current sources and assigned reviewer approval. The worker uses `openai:gpt-6-luna` with a $1 global daily reservation ceiling. `.env.example` defaults remain fixture/off for development.
 
-Private-sample tests explicitly skip in public CI when `forsahil.apkg` is absent. CI runs all synthetic tests and production browser journeys; the included GitHub Actions workflow has not been executed on a remote repository during this build. Docker is unavailable here, so the provided container/local-Supabase configuration needs its first runtime check.
+Standard token rates were checked against the [official GPT-6 Luna page](https://developers.openai.com/api/docs/models/gpt-6-luna): $0.10/M input and $0.50/M output. The ledger reserves a conservative bound; it is not invoice telemetry. Recheck rates when changing model or processing tier.
 
-## Live deployment checklist
+## Remaining independent gates
 
-Complete these after [manual setup](manual-setup.md), using two separate browser profiles/devices:
+- Confirm hosted email delivery and callback allowlists; confirmed synthetic accounts do not prove SMTP delivery.
+- Qualified medical reviewers, approved medical activities, representative students and the evaluation protocol. Immediate repairs do not prove lasting learning.
+- Real iOS/Android/Safari/Firefox, screen readers and quota/eviction behavior.
+- Authorized personal histories, image-heavy collections and broader target template/occlusion fixtures. Exact limitations: `import-compatibility.md`.
+- Operator database **and** Storage recovery drill and measured RPO/RTO. Native backup restoration is tested; cloud disaster recovery is separate.
+- Local Docker Compose web stack is supplied but not run here; the Railway worker container is verified.
 
-1. Sign in through actual email delivery; confirm callback origin and refreshed sessions.
-2. Claim a guest library, interrupt/retry during upload, and confirm source/history/media counts with no reset.
-3. Sign in as the same user on device B; compare card state/head and render downloaded images/audio.
-4. Go offline on both devices. Review the same card independently, reconnect in both possible orders, and verify one canonical extension with the other event preserved. Check delayed descendants and undo conflicts.
-5. Review different cards offline, reload before reconnecting, and verify all intended events arrive once.
-6. Switch between two accounts; confirm that notes, activity approvals, storage objects and local UI remain partitioned.
-7. Download and restore a native backup into a fresh profile; test your actual hosting database/storage restore procedure.
-8. Exercise sign-out with pending changes, cancelled jobs, rejected approval attempts, reported content quarantine, and typed-confirmation cloud deletion.
-9. Complete one synthetic fixture job, then one consented live provider draft with a spend limit; verify that only assigned human approval makes it eligible.
-
-Before daily-study adoption, add authorized fixtures from the intended Anki versions, real personal SM-2/FSRS histories, larger image-heavy decks and the target image-occlusion corpus. Test Safari/iOS, Firefox and Android; verify keyboard/focus, screen reader, zoom, contrast, and denied/evicted/quota-limited storage. Extended divergent-history reconciliation and broad unsupported-template adapters require additional engineering if those cases are required by the pilot.
-
-## Scope gates
-
-- **Technical alpha:** implemented and locally tested within the compatibility matrix.
-- **Medical pilot:** pending qualified content review, live-service/device verification and an agreed evaluation protocol.
-- **Adoption release:** pending representative history/template/performance coverage, live recovery guarantees, cross-device operational evidence and target-user workflow validation.
-
-Do not remove these distinctions merely because the application compiles or the sample imports successfully.
+This is a deployable technical beta. Broader medical-pilot/adoption evidence remains open; no Phase 5/6 completion is claimed.

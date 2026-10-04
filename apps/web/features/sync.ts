@@ -10,6 +10,7 @@ import {
 import { copyGuest } from "./claim";
 import { mutationOrder } from "@recall/sync";
 import { Library, syncEntities, serializeEntity } from "../lib/db/local";
+class LocalChangesDuringPull extends Error {}
 
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(path, {
@@ -132,7 +133,7 @@ async function runSync(db: Library, status: (s: string) => void) {
       [...syncEntities.map((t) => db.table(t)), db.reviews, db.meta, db.outbox],
       async () => {
         if (await db.outbox.count())
-          throw new Error(
+          throw new LocalChangesDuringPull(
             "New local work is saved. Sync will resume on the next pass.",
           );
         for (const change of page.changes as Change[]) {
@@ -174,7 +175,19 @@ const active = new Map<string, Promise<void>>();
 export function syncLibrary(db: Library, status: (s: string) => void) {
   const pending = active.get(db.name);
   if (pending) return pending;
-  const run = () => runSync(db, status);
+  const run = async () => {
+    // Guest claim or a review can add an outbox entry while a pull is in
+    // flight. Push that work before trying the pull again, without an error UI.
+    for (let pass = 0; pass < 3; pass++) {
+      try {
+        await runSync(db, status);
+        return;
+      } catch (error) {
+        if (!(error instanceof LocalChangesDuringPull)) throw error;
+      }
+    }
+    status("Saved here · changes waiting for the next sync");
+  };
   const promise = (
     navigator.locks
       ? navigator.locks.request(`recall-sync-${db.owner}`, run)

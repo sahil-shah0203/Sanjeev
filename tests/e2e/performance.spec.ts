@@ -68,21 +68,19 @@ test("browse searches 50,000 synthetic cards with bounded DOM output", async ({
   const searchMs = Date.now() - searchStart;
   await expect(page.locator(".card-link")).toHaveCount(1);
   expect(searchMs).toBeLessThan(2000);
-  await test
-    .info()
-    .attach("performance", {
-      body: JSON.stringify(
-        {
-          cards: 50000,
-          initialMs,
-          searchMs,
-          scope:
-            "Desktop Chromium, text-only synthetic IndexedDB library; not a mobile benchmark",
-        },
-        null,
-        2,
-      ),
-      contentType: "application/json",
-    });
+  await test.info().attach("performance", {
+    body: JSON.stringify(
+      {
+        cards: 50000,
+        initialMs,
+        searchMs,
+        scope:
+          "Desktop Chromium, text-only synthetic IndexedDB library; not a mobile benchmark",
+      },
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
   console.log(JSON.stringify({ initialMs, searchMs, cards: 50000 }));
 });

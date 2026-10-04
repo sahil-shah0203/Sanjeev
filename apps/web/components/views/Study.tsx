@@ -241,7 +241,11 @@ export default function Study() {
       const exposures = await db.exposures
         .where("noteId")
         .equals(item.note.id)
-        .filter((e) => e.sessionId === session.id || Date.parse(e.at) > Date.now() - 30 * 60000)
+        .filter(
+          (e) =>
+            e.sessionId === session.id ||
+            Date.parse(e.at) > Date.now() - 30 * 60000,
+        )
         .toArray();
       const contaminated = exposures.some(
         (e) =>

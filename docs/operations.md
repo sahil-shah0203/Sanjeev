@@ -8,10 +8,12 @@ Use [manual setup](manual-setup.md) for credentials and the first deployment. We
 2. Apply forward-compatible SQL migrations before the application starts. Never reset a live database to fix a migration.
 3. Confirm `/api/health` returns 200. This is a process health check, not proof of database/email/model availability.
 4. Verify real authentication, a sync push/pull, one media upload/download, and guest claim with your project.
-5. Supervise the persistent Node worker when generation/grading is enabled. It logs `worker_ready`, job identifiers/kinds, completion, or redacted error codes. A process manager should restart it after a database outage.
-6. Keep AI disabled until reviewer assignments and approved content exist. Run a synthetic fixture job before any paid call.
+5. Supervise the persistent Node worker when generation/grading is enabled. It logs job identifiers and redacted errors, backs off and retries database outages, and returns 503 from `/healthz` when database contact is stale. Railway restarts failed processes.
+6. Generation produces drafts only; delivery requires assigned review and learner opt-in. Run a synthetic fixture job before a paid call. Paid jobs have no automatic retries.
 
-The Docker web target runs the standalone server as the unprivileged `node` user. Docker images are not runtime-verified in this workspace. Use a reverse proxy/TLS and the hosting platform's current security updates. Account/database limits, SMTP restrictions, storage pricing, and backup retention depend on your selected plan.
+The Docker web target runs as the unprivileged `node` user. Railway's dedicated worker image is runtime verified; the optional local Compose web stack is not. Use HTTPS and current platform security updates. Account limits, SMTP restrictions, pricing and retention depend on the plan.
+
+Vercel packages public assets during Next's build adapter: the offline manifest is generated in `compiler.runAfterProductionCompile` before that step. After deploying, run the public offline browser journey. Railway uses [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) in `.railway/railway.ts`; legacy `railway.json` does not configure new services. Inspect `railway config plan`: secrets must remain `preserve()`, and a routine update should show no deletions.
 
 ## Reviewer assignments
 

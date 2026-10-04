@@ -1,6 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { buildOfflineShell } from "../../scripts/build-sw.mjs";
 
 for (const file of [".env", "apps/web/.env.local"]) {
   if (existsSync(file)) process.loadEnvFile(file);
@@ -16,6 +17,11 @@ const config = {
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   agentRules: false,
+  compiler: {
+    runAfterProductionCompile: async ({ distDir, projectDir }) => {
+      await buildOfflineShell(distDir, path.join(projectDir, "public"));
+    },
+  },
   webpack(config) {
     config.resolve.fallback = {
       ...config.resolve.fallback,

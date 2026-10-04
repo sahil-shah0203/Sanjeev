@@ -1,6 +1,7 @@
 import { hash, type Activity } from "@recall/domain";
 import { transaction } from "./database";
 import { HttpError } from "./auth";
+import { PROMPT_VERSION } from "@recall/ai";
 export async function enqueueGeneration(
   owner: string,
   noteId: string,
@@ -61,7 +62,8 @@ export async function enqueueGeneration(
         version: note.version,
         task,
         format,
-        prompt: "source-only-1",
+        prompt: PROMPT_VERSION,
+        provider: process.env.LLM_PROVIDER ?? "fixture",
         model: process.env.LLM_MODEL ?? "fixture",
       }),
     );

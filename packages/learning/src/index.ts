@@ -23,6 +23,11 @@ export function eligibleActivity(
   if (session.budgetMinutes <= 0 || session.budgetMinutes < 5 || overdue > 100)
     return false;
   if (
+    activity.expectedSeconds > 45 ||
+    (activity.format === "brief_explanation" && activity.expectedSeconds > 30)
+  )
+    return false;
+  if (
     session.completed ||
     session.activeMs +
       session.interventionMs +

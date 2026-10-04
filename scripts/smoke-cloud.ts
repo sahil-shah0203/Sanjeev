@@ -94,13 +94,11 @@ try {
   const page = await a.newPage();
   const file = await syntheticPackage(true);
   await page.goto(`${origin}/import`);
-  await page
-    .getByLabel("Choose Anki package")
-    .setInputFiles({
-      name: file.name,
-      mimeType: "application/zip",
-      buffer: Buffer.from(await file.arrayBuffer()),
-    });
+  await page.getByLabel("Choose Anki package").setInputFiles({
+    name: file.name,
+    mimeType: "application/zip",
+    buffer: Buffer.from(await file.arrayBuffer()),
+  });
   await page
     .getByRole("button", { name: "Import 6 cards", exact: true })
     .click();
@@ -146,22 +144,24 @@ try {
         "reviews",
         "outbox",
       ]);
-      const read = <T>(r: IDBRequest<T>) =>
-        new Promise<T>((resolve) => {
-          r.onsuccess = () => resolve(r.result);
-        });
-      const [cards, states, media, reviews, pending] = await Promise.all([
-        read(tx.objectStore("cards").getAll()),
-        read(tx.objectStore("states").getAll()),
-        read(tx.objectStore("media").getAll()),
-        read(tx.objectStore("reviews").getAll()),
-        read(tx.objectStore("outbox").count()),
-      ]);
+      const [cards, states, media, reviews, pending] = await Promise.all(
+        ["cards", "states", "media", "reviews", "outbox"].map(
+          (store) =>
+            new Promise<any>((resolve, reject) => {
+              const r =
+                store === "outbox"
+                  ? tx.objectStore(store).count()
+                  : tx.objectStore(store).getAll();
+              r.onsuccess = () => resolve(r.result);
+              r.onerror = () => reject(r.error);
+            }),
+        ),
+      );
       db.close();
       return {
         cards: cards.length,
         states,
-        media: media.map((m) => ({
+        media: media.map((m: any) => ({
           id: m.id,
           hash: m.hash,
           bytes: m.blob.size,
@@ -181,6 +181,9 @@ try {
   expect(stateB.media[0].bytes).toBeGreaterThan(0);
   result.crossDevice =
     "Matching card states, review head, and verified private media";
+  await second.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
   await b.setOffline(true);
   await second.goto(origin);
   await second.getByRole("button", { name: "Start a session" }).click();
@@ -216,6 +219,59 @@ try {
   expect(denied.status()).toBe(404);
   result.tenantIsolation =
     "Other authenticated account cannot read source documents or request private media";
+  if (process.env.SMOKE_GENERATION === "1") {
+    await page
+      .getByRole("checkbox", { name: /Allow selected source excerpts/ })
+      .click();
+    await expect(
+      page.getByRole("checkbox", { name: /Allow selected source excerpts/ }),
+    ).toBeChecked();
+    await expect
+      .poll(async () => (await rows(alice.id, "preferences"))[0]?.aiConsent, {
+        timeout: 30000,
+      })
+      .toBe(true);
+    const source = (await rows(alice.id, "notes")).find(
+      (n) => n.guid === "recall-demo-5",
+    );
+    const request = {
+      headers: { origin },
+      data: { noteId: source.id, task: "recall", format: "short_answer" },
+    };
+    const queued = await a.request.post(`${origin}/api/generation`, request);
+    expect(queued.status()).toBe(202);
+    const job = await queued.json();
+    const retry = await a.request.post(`${origin}/api/generation`, request);
+    expect((await retry.json()).id).toBe(job.id);
+    await expect
+      .poll(
+        async () => {
+          const response = await a.request.get(`${origin}/api/jobs/${job.id}`);
+          return (await response.json()).status;
+        },
+        { timeout: 120000, intervals: [1000, 2000, 5000] },
+      )
+      .toBe("succeeded");
+    const draft = (await rows(alice.id, "activities"))[0];
+    expect(draft.status).toBe("draft");
+    expect(draft.sources[0].noteId).toBe(source.id);
+    expect(draft.approvedHash).toBeUndefined();
+    const unassigned = await a.request.post(`${origin}/api/review-content`, {
+      headers: { origin },
+      data: {
+        owner: alice.id,
+        action: "approve",
+        activity: draft,
+        comment: "Unauthorized synthetic approval probe",
+      },
+    });
+    expect(unassigned.status()).toBe(403);
+    result.generation = {
+      provider: draft.modelVersion,
+      status:
+        "Durable source-grounded draft completed once; activation blocked without assigned reviewer",
+    };
+  }
   await mkdir("test-results", { recursive: true });
   await writeFile(
     "test-results/cloud-smoke.json",

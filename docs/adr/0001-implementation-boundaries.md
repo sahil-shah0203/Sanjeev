@@ -1,6 +1,6 @@
 # ADR 0001: conservative, inspectable implementation
 
-Date: 2026-10-03. Status: accepted for the technical alpha; adoption gates remain explicit.
+Date: 2026-10-03. Status: accepted for the technical beta; medical-pilot and adoption evidence gates remain explicit.
 
 The root `01` guide governs learning policy and `02` governs engineering. The following choices make the implemented boundaries reviewable.
 
@@ -13,6 +13,6 @@ The root `01` guide governs learning policy and `02` governs engineering. The fo
 7. **Database envelope.** Typed owner-scoped JSONB documents support the first schema with fewer duplicate migrations. Runtime schemas, reference triggers, restricted server roles, immutable audit proposals and indexes enforce the important boundaries. Per-entity SQL tables can replace the envelope in a forward migration if operational evidence warrants it.
 8. **No automatic medical approval.** Every generated activity, including recall, requires assigned human approval. Editing substantive content creates a new ID/version. Backups cannot serve as approval credentials; restored practice is quarantined. The fixture provider operates only on the synthetic demo.
 9. **Bounded infrastructure.** The app has one web service, Postgres/Auth/private Storage, and one persistent worker. Imports/exports run locally within published limits; users must export smaller selections beyond them. Hosted large-import/export jobs are not exposed as placeholder features.
-10. **Transparent release level.** Passing synthetic, PostgreSQL and Chromium tests supports a technical alpha. Hosted integrations, real student history/template coverage, cross-browser/accessibility review, qualified medical checks and learning outcomes remain independent evidence gates.
+10. **Transparent release level.** Synthetic/PostgreSQL/Chromium tests and verified Vercel/Supabase/Railway workflows support this technical beta. Representative student histories/templates, real-device/screen-reader review, qualified medical checks and learning outcomes remain independent evidence gates.
 
-Policy hypothesis: a 30-minute recent-source-exposure window conservatively blocks same-material successful schedule credit; an explicit failed original attempt can still record a lapse. This window and intervention budgets are product defaults to evaluate, not proven learning constants. Scheduled learning/relearning steps retain priority. Optional checks are limited to one per ten original reviews, 15% of a timed session, and one brief explanation; large backlogs reduce eligibility.
+Policy hypothesis: same-session and 30-minute recent-source exposure conservatively block same-material successful schedule credit; an explicit failed original attempt can still record a lapse. This window and intervention budgets are defaults to evaluate, not proven learning constants. Learning/relearning steps retain priority. Automatic checks are limited to one per ten original reviews, 15% of planned time, and one brief explanation; large backlogs defer them. Display reserves counts, feedback time persists, and explicit deeper study is labeled assisted exposure.

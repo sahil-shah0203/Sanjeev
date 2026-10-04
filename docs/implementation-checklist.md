@@ -7,12 +7,13 @@ The two root guides are the source of truth. Checkmarks indicate verified work, 
 - [x] Account implementation: optional auth, owner partitions, retry-safe guest copy, real event reconciliation, private-media adapters, RLS tests.
 - [x] Adaptive implementation: source-linked drafts, validation, assigned human-review workflow, report resolution, budgeted delivery, conservative grades/disputes and leased worker.
 - [x] Portability: content-only Anki export, native restore, conservative complete-history replay and explicit source updates.
-- [x] Local release evidence: Chromium desktop/mobile/offline journeys, hostile fixtures, PostgreSQL tests and a 10,000-card text benchmark.
+- [x] Local release evidence: Chromium desktop/mobile/offline journeys, hostile fixtures, PostgreSQL tests and 50,000-card import/search benchmarks.
 - [x] Setup, deployment packaging, recovery instructions, dependency provenance, evaluation plan and explicit compatibility limits.
-- [ ] Live Supabase Auth/Storage/email, actual two-device cloud journey, Docker runtime and hosted recovery drill — requires configured infrastructure.
+- [x] Hosted Supabase Auth/Storage/RLS, two-browser progress, Railway runtime, Vercel import/offline/native recovery and source-linked fixture/real-model jobs.
+- [ ] Hosted email delivery, operator database/Storage restore drill and representative real-device workflows.
 - [ ] Qualified medical-content approval and pilot evaluation — requires reviewers and participants.
 - [ ] Broad adoption gate: authorized real-history/template fixtures, target mobile/browser/accessibility and media-heavy performance evidence; additional adapters where the target corpus requires them.
 
 Production credentials, qualified medical review, and actual student/device evaluation are owner tasks; code completeness must not be confused with those release gates.
 
-See [verification](verification.md) and [manual tasks](manual-setup.md). The product remains explicitly labeled technical alpha until the independent release gates are met.
+See [Phase 4 checklist](phase-4-beta.md), [verification](verification.md) and [manual tasks](manual-setup.md). The product is a technical beta; medical-pilot and broader adoption evidence remain separate gates.

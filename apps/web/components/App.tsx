@@ -119,7 +119,7 @@ function Shell() {
         </main>
         <footer className="app-footer">
           <span>A little recall. A little more understanding.</span>
-          <span>Technical alpha · your progress stays yours.</span>
+          <span>Beta · your progress stays yours.</span>
         </footer>
       </div>
       <nav className="mobile-nav" aria-label="Mobile navigation">

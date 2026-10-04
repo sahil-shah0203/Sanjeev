@@ -10,13 +10,11 @@ test("public modern package imports, reopens offline and restores with media", a
 }) => {
   const file = await syntheticPackage(true);
   await page.goto("/import");
-  await page
-    .getByLabel("Choose Anki package")
-    .setInputFiles({
-      name: file.name,
-      mimeType: "application/zip",
-      buffer: Buffer.from(await file.arrayBuffer()),
-    });
+  await page.getByLabel("Choose Anki package").setInputFiles({
+    name: file.name,
+    mimeType: "application/zip",
+    buffer: Buffer.from(await file.arrayBuffer()),
+  });
   await page
     .getByRole("button", { name: "Import 6 cards", exact: true })
     .click();

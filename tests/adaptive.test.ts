@@ -134,6 +134,24 @@ it("requires distinct-day failures and respects time, count, backlog, source and
       0,
     ),
   ).toBe(false);
+  expect(
+    eligibleActivity(
+      { ...activities[0], expectedSeconds: 46 },
+      context.session,
+      bundle.notes,
+      new Set(),
+      0,
+    ),
+  ).toBe(false);
+  expect(
+    eligibleActivity(
+      { ...activities[0], format: "brief_explanation", expectedSeconds: 31 },
+      context.session,
+      bundle.notes,
+      new Set(),
+      0,
+    ),
+  ).toBe(false);
 });
 it("rotates format deterministically within an objective without changing the cognitive task", async () => {
   const { context, activities } = await setup();

@@ -1,6 +1,7 @@
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
-const build = (await readFile("apps/web/.next/BUILD_ID", "utf8")).trim();
 async function files(dir, prefix) {
   const output = [];
   for (const item of await readdir(dir, { withFileTypes: true })) {
@@ -12,23 +13,33 @@ async function files(dir, prefix) {
   }
   return output;
 }
-const assets = [
-  ...(await files("apps/web/.next/static", "/_next/static")),
-  "/wasm/sql-wasm.wasm",
-  "/favicon.svg",
-  "/manifest.webmanifest",
-];
-const shell = [
-  "/",
-  "/decks",
-  "/browse",
-  "/progress",
-  "/settings",
-  "/import",
-  "/review-content",
-  "/study/offline",
-];
-const worker = `const CACHE=${JSON.stringify(`recall-shell-${build}`)};
+export async function buildOfflineShell(
+  distDir = "apps/web/.next",
+  publicDir = "apps/web/public",
+) {
+  const assets = [
+    ...(await files(path.join(distDir, "static"), "/_next/static")),
+    "/wasm/sql-wasm.wasm",
+    "/favicon.svg",
+    "/manifest.webmanifest",
+  ];
+  // The compiler hook runs before Vercel collects public assets. BUILD_ID and
+  // build-manifest files can be written later, so version the actual asset list.
+  const build = createHash("sha256")
+    .update(JSON.stringify(assets.sort()))
+    .digest("hex")
+    .slice(0, 20);
+  const shell = [
+    "/",
+    "/decks",
+    "/browse",
+    "/progress",
+    "/settings",
+    "/import",
+    "/review-content",
+    "/study/offline",
+  ];
+  const worker = `const CACHE=${JSON.stringify(`recall-shell-${build}`)};
 const ASSETS=${JSON.stringify(assets)};
 const SHELL=${JSON.stringify(shell)};
 async function cacheShell(){const cache=await caches.open(CACHE);await cache.addAll([...ASSETS,...SHELL]);}
@@ -39,7 +50,13 @@ self.addEventListener('fetch',event=>{const request=event.request;const url=new 
 if(request.mode==='navigate'){event.respondWith(fetch(request).catch(async()=>{const cache=await caches.open(CACHE);return await cache.match(url.pathname)||await cache.match('/')||Response.error();}));return;}
 if(url.pathname.startsWith('/_next/static/')||url.pathname.startsWith('/wasm/')||url.pathname.startsWith('/fonts/')||ASSETS.includes(url.pathname)){event.respondWith(caches.open(CACHE).then(async cache=>{const cached=await cache.match(request);if(cached)return cached;const response=await fetch(request);if(response.ok)await cache.put(request,response.clone());return response;}));}
 });`;
-await writeFile("apps/web/public/sw.js", worker);
-console.log(
-  `Offline shell ${build}: ${assets.length} static assets, ${shell.length} routes.`,
-);
+  await writeFile(path.join(publicDir, "sw.js"), worker);
+  console.log(
+    `Offline shell ${build}: ${assets.length} static assets, ${shell.length} routes.`,
+  );
+}
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+)
+  await buildOfflineShell();
