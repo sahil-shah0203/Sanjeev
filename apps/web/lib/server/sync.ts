@@ -92,7 +92,7 @@ async function validatePut(db: PoolClient, owner: string, m: Mutation) {
     const activity = ActivitySchema.parse(value);
     const existing = await get(db, owner, "activities", value.id);
     if (
-      activity.status === "human_approved" &&
+      ["human_approved", "source_bounded"].includes(activity.status) &&
       (!existing || stableJson(existing.value) !== stableJson(activity))
     )
       throw new HttpError(

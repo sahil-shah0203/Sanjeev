@@ -7,7 +7,13 @@ import { enqueue } from "../lib/db/local";
 import { Notice } from "./ui";
 
 /** Model/self-check feedback is an annotation, never a scheduler write. */
-export default function AttemptFeedback({ attempt }: { attempt: Attempt }) {
+export default function AttemptFeedback({
+  attempt,
+  sourceOnly = false,
+}: {
+  attempt: Attempt;
+  sourceOnly?: boolean;
+}) {
   const { db, user, prefs, sync, features } = useLibrary();
   const [job, setJob] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -104,7 +110,7 @@ export default function AttemptFeedback({ attempt }: { attempt: Attempt }) {
           </button>
         </div>
       )}
-      {user && prefs.aiConsent && features.generation && (
+      {!sourceOnly && user && prefs.aiConsent && features.generation && (
         <button className="text-button" disabled={busy} onClick={request}>
           {busy ? "Checking feedback…" : "Request rubric feedback"}
         </button>

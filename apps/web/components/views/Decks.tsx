@@ -15,11 +15,11 @@ import {
 import { type ImportBundle, errorMessage } from "@recall/domain";
 import { ankiContent } from "@recall/exporter";
 import { useLibrary } from "../LibraryProvider";
-import { eligibleCards, startSession } from "../../lib/db/local";
+import { eligibleCards } from "../../lib/db/local";
 import { download } from "../../features/backup";
 import { PageTitle, Empty, Notice } from "../ui";
 export default function Decks() {
-  const { db, prefs } = useLibrary();
+  const { db } = useLibrary();
   const tick = useClock();
   const router = useRouter();
   const routedPath = usePathname();
@@ -39,8 +39,7 @@ export default function Decks() {
   const report = imports.find((i) => i.id === deck?.importId);
   const deckCards = cards.filter((c) => c.deckId === deckId);
   const start = async (d: string) => {
-    const s = await startSession(db, d, prefs.budgetMinutes);
-    router.push(`/study/${s.id}`);
+    router.push(`/?deck=${encodeURIComponent(d)}`);
   };
   const exportDeck = async () => {
     if (!deck || !report) return;
@@ -131,7 +130,7 @@ export default function Decks() {
     <>
       <PageTitle
         eyebrow={deck ? "YOUR DECK" : "YOUR LIBRARY"}
-        title={deck?.name.split("::").at(-1) ?? "Built on what you know."}
+        title={deck?.name.split("::").at(-1) ?? "Your decks"}
         description={
           deck
             ? "Your source cards, study history, and compatibility in one place."

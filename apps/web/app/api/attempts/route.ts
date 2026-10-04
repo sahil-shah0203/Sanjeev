@@ -63,6 +63,22 @@ export async function POST(request: Request) {
           "ATTEMPT_MISSING",
           "Sync the saved answer before requesting a grade.",
         );
+      const activity = (
+        await db.query(
+          "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='activities' AND id=$2 AND deleted=false",
+          [user.id, attempt.value.activityId],
+        )
+      ).rows[0]?.value;
+      if (
+        !activity ||
+        activity.status !== "human_approved" ||
+        activity.sourceRecipe
+      )
+        throw new HttpError(
+          403,
+          "APPROVED_ACTIVITY_REQUIRED",
+          "Source exercises use self-check only. No model grade is requested.",
+        );
       return (
         await db.query(
           "INSERT INTO public.jobs(owner_id,kind,idempotency_key,input,max_attempts) VALUES($1,'grade',$2,$3,1) ON CONFLICT(owner_id,idempotency_key) DO UPDATE SET idempotency_key=excluded.idempotency_key RETURNING id,status",

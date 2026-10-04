@@ -1,5 +1,19 @@
 # Implementation and release gates
 
+## Phase 4.5 execution
+
+- [x] Visible Sanjeev identity, warm-neutral surfaces and updated install icon; persistent identifiers retained.
+- [x] Today study setup, Decks import entry, separate preferences/account pages and skippable Help guide.
+- [x] Session AI toggle, source-only exercise compiler, durable request/worker path, server publication protection and deterministic fixture support.
+- [x] Source references, report quarantine, conservative self-check, count/time caps and independent FSRS boundary.
+- [x] Unit/integration coverage for source edits/tampering, abstention, budgets, consent, quotas, ownership, idempotency and reports.
+- [ ] Final local production browser/accessibility/offline verification.
+- [ ] Vercel/Railway deployment, hosted import/study/sync/source exercise smoke, and GitHub push.
+
+See [Phase 4.5 release details](phase-4.5-release.md). Remaining evaluation and device gates below still apply.
+
+## Phase 4 foundation
+
 The two root guides are the source of truth. Checkmarks indicate verified work, not intended features.
 
 - [x] Foundation: pinned dependencies, contracts, scheduler, importer, renderer, build and tests.

@@ -338,14 +338,14 @@ export default function ImportView() {
                           checked={fresh}
                           onChange={(e) => setFresh(e.target.checked)}
                         />
-                        Start these cards fresh in Recall. Keep the original
+                        Start these cards fresh in Sanjeev. Keep the original
                         scheduling data and logs in my backup.
                       </label>
                     ) : (
                       <>
                         <p>
                           {migration?.replayedReviews} ratings will reconstruct
-                          memory using Recall’s pinned FSRS defaults.{" "}
+                          memory using Sanjeev’s pinned FSRS defaults.{" "}
                           {migration?.preservedDates} first due days remain
                           unchanged in {prefs.timezone}. Future intervals can
                           differ from Anki.

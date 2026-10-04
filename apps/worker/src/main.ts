@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { createServer } from "node:http";
 import { id, type Activity, type Note } from "@recall/domain";
 import { modelProvider } from "@recall/ai";
-import { validateActivity } from "@recall/learning";
+import { validateActivity, validSourceActivity } from "@recall/learning";
 import { publishWithLease } from "./leases";
 
 // Uses Node's built-in .env loader; never print credentials or source content.
@@ -100,7 +100,19 @@ async function execute(job: any) {
         [job.owner_id],
       )
     ).rows[0]?.value;
-    if (!prefs?.aiConsent) throw new Error("CONSENT_REQUIRED");
+    const bounded = job.input.mode === "source_practice";
+    if (bounded) {
+      if (process.env.ENABLE_SOURCE_PRACTICE !== "true")
+        throw new Error("GENERATION_DISABLED");
+      const s = (
+        await pool.query(
+          "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='sessions' AND id=$2 AND deleted=false",
+          [job.owner_id, job.input.sessionId],
+        )
+      ).rows[0]?.value;
+      if (!job.input.consent || !s?.aiQuestions || s.completed)
+        throw new Error("CONSENT_REQUIRED");
+    } else if (!prefs?.aiConsent) throw new Error("CONSENT_REQUIRED");
     const note = (
       await pool.query(
         "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='notes' AND id=$2 AND deleted=false",
@@ -110,15 +122,22 @@ async function execute(job: any) {
     if (!note || note.version !== job.input.version)
       throw new Error("SOURCE_CHANGED");
     await reserveBudget(job.owner_id, job.id);
-    const result = await modelProvider().generate(
-      [note],
-      job.input.task,
-      job.input.format,
-    );
+    const result = bounded
+      ? await modelProvider().sourcePractice(note, job.input.variant)
+      : await modelProvider().generate(
+          [note],
+          job.input.task,
+          job.input.format,
+        );
     if (result.activity) {
       const errors = validateActivity(result.activity, [note]);
+      if (bounded && !validSourceActivity(result.activity, [note]))
+        return { abstain: "Unsupported source exercise." };
       if (errors.length) return { abstain: errors.join(" ") };
-      const a = { ...result.activity, status: "draft" };
+      const a = {
+        ...result.activity,
+        status: bounded ? "source_bounded" : "draft",
+      };
       await publishWithLease(pool, job, async (db) => {
         const current = (
           await db.query(
@@ -128,12 +147,25 @@ async function execute(job: any) {
         ).rows[0]?.value;
         if (current?.version !== note.version)
           throw new Error("SOURCE_CHANGED");
+        if (bounded) {
+          const s = (
+            await db.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='sessions' AND id=$2 AND deleted=false FOR UPDATE",
+              [job.owner_id, job.input.sessionId],
+            )
+          ).rows[0]?.value;
+          if (!s?.aiQuestions || s.completed)
+            throw new Error("CONSENT_REQUIRED");
+        }
         return db.query(
           "INSERT INTO public.documents(owner_id,entity,id,value) VALUES($1,'activities',$2,$3) ON CONFLICT(owner_id,entity,id) DO NOTHING",
           [job.owner_id, a.id, JSON.stringify(a)],
         );
       });
-      return { activityId: a.id, status: "awaiting_human_review" };
+      return {
+        activityId: a.id,
+        status: bounded ? "source_bounded" : "awaiting_human_review",
+      };
     }
     return result;
   }
@@ -163,6 +195,7 @@ async function execute(job: any) {
       !attempt ||
       !activity ||
       activity.status !== "human_approved" ||
+      activity.sourceRecipe ||
       activity.version !== attempt.activityVersion
     )
       throw new Error("APPROVED_ACTIVITY_REQUIRED");

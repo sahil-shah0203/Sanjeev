@@ -1,8 +1,8 @@
-# Recall
+# Sanjeev
 
-A local-first study application built from the two learning/build guides in this repository. It imports Anki packages, runs ordinary spaced-repetition review offline, preserves source data, and offers optional human-reviewed understanding checks.
+A local-first study application built from the two learning/build guides in this repository. It imports Anki packages, runs ordinary FSRS review offline, preserves source data, and offers optional source-based AI exercises. The Phase 4.5 interface uses warm paper colors, separates preferences from Account & data, and includes a short Help guide.
 
-**Release status: Phase 4 technical beta.** Try [the deployed app](https://recall-sepia-seven.vercel.app). Vercel hosts the web app, Supabase provides Auth/Postgres/private Storage, and Railway runs the durable worker. Ordinary study requires neither login nor AI. This beta does not establish medical correctness, educational benefit, or universal Anki compatibility. See [friend testing](docs/beta-testing.md), [remaining owner tasks](docs/manual-setup.md), and [release evidence](docs/verification.md). Phase 5 and Phase 6 are outside this release.
+**Release status: Phase 4.5 technical beta.** Try [the deployed app](https://recall-sepia-seven.vercel.app). Vercel hosts the web app, Supabase provides Auth/Postgres/private Storage, and Railway runs the durable worker. Ordinary study requires neither login nor AI. This beta does not establish medical correctness, educational benefit, or universal Anki compatibility. See [Phase 4.5 behavior and verification](docs/phase-4.5-release.md), [friend testing](docs/beta-testing.md), and [remaining owner tasks](docs/manual-setup.md). Phase 5 and Phase 6 are outside this release.
 
 ## Run it
 
@@ -33,7 +33,7 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 - Deterministic `ts-fsrs@5.4.2` scheduling, due/new separation, study-day rollover, sibling burying, keyboard review, durable atomic saves, undo, session resume, and no-attempt exposure tracking.
 - Browsing/search in a worker with paged results; note editing with revisions; suspend, bury, flag, and source reports.
 - Explicit fresh import or conservative replay of complete standard personal histories. First due calendar days are preserved in the confirmed export timezone. Incomplete, filtered, or manually rescheduled histories require a supported re-export or an explicit fresh start.
-- Explicit updates to a known collection without resetting Recall schedules. Local edits remain preserved as conflicts. Changed templates/media require a separate collection.
+- Explicit updates to a known collection without resetting Sanjeev schedules. Local edits remain preserved as conflicts. Changed templates/media require a separate collection.
 - Checksummed native backup/clean-profile restore, including schedules, histories, local conflict proposals, media, and original archives present on this device. Content-only Anki export with transformation warnings.
 - Optional Supabase email authentication, owner-separated browser libraries, resumable guest copying, transactional server reconciliation, idempotent mutation receipts, paginated pulls, private media, and account deletion.
 - Optional source-grounded draft generation, persistent leased worker, quotas/spend reservations, protected human review and authoring, report resolution, deterministic grading/self-check, disputes, and bounded adaptive delivery. Normal review has no model dependency.
@@ -44,9 +44,9 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 
 Read [import compatibility](docs/import-compatibility.md) before moving a real collection. Arbitrary add-on templates, nested clozes, third-party image occlusion, rotated/custom masks, full Anki scheduling round trips, AnkiWeb sync, and AnkiHub updates are outside this release's supported subset. Larger than 512 MiB packages must be exported as smaller selections; there is no hosted large-import service.
 
-History replay uses Recall's pinned defaults, not a claim to reproduce every Anki scheduler configuration. Untested histories are preserved rather than guessed. The replay fixture corpus is synthetic; representative authorized personal histories still need validation.
+History replay uses Sanjeev's pinned defaults, not a claim to reproduce every Anki scheduler configuration. Untested histories are preserved rather than guessed. The replay fixture corpus is synthetic; representative authorized personal histories still need validation.
 
-Sync preserves a single canonical review chain and retains conflicting branches as audit history without double credit. Conflict export is available in Settings; automatic merging of extended divergent histories is deliberately absent. Original `.apkg` archive Blobs remain on the importing device and in its native backup; cloud sync carries normalized source/raw metadata and media, not the archive Blob itself.
+Sync preserves a single canonical review chain and retains conflicting branches as audit history without double credit. Conflict export is available in Account & data; automatic merging of extended divergent histories is deliberately absent. Original `.apkg` archive Blobs remain on the importing device and in its native backup; cloud sync carries normalized source/raw metadata and media, not the archive Blob itself.
 
 Native restore quarantines generated practice until it is reviewed again. A checksum detects corruption; it is not proof of medical approval. Browser storage can be cleared or evicted. Keep an independent native backup.
 
@@ -70,6 +70,8 @@ See [verification](docs/verification.md) for actual results and limits. The suit
 
 For the 50,000-card benchmarks, set `PERF_CARDS=50000` for `npm run test:performance` and `PERF_BROWSER=1` for the production browser suite. To repeat the live cloud smoke, explicitly set `SMOKE_ORIGIN` and run `npx tsx scripts/smoke-cloud.ts` with the test project's server credentials; `SMOKE_GENERATION=1` also exercises the durable draft job. It creates synthetic accounts, sends no emails, and deletes only those accounts and their media. A paid provider may incur one bounded request. Use a dedicated staging project when developing new automated tests.
 
+For the Phase 4.5 hosted source-only flow, use the same environment with `npx tsx scripts/smoke-source-practice.ts`. It imports twelve synthetic cards, opts in, checks a real worker exercise after ten original reviews, reports it, verifies no FSRS credit and revoked consent, then removes its synthetic account. It may incur up to three bounded provider requests.
+
 ## Deployment and configuration
 
 Copy `.env.example` to the ignored root `.env` and `apps/web/.env.local` for local services. `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are public build-time configuration. `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `LLM_API_KEY` are server secrets. `APP_ORIGIN` must exactly match the web origin. Apply both SQL migrations in `supabase/migrations` once using `supabase link` and `supabase db push`.
@@ -78,7 +80,7 @@ Use Supabase's session pooler on IPv4-only hosts. Configure Auth Site URL as `ht
 
 Railway configuration lives in `.railway/railway.ts`, with `Dockerfile.worker` and `/healthz`. Run `railway config plan`, review the changes, then `railway config apply --yes` and `railway up --service recall-worker`. Existing secrets use `preserve()`. The worker needs `DATABASE_URL`, `ENABLE_AI_GENERATION`, and the `LLM_*` variables listed in `.env.example`; it recovers from database outages and rechecks source/approval versions before publication. Imports and exports run in bounded browser workers; large hosted import/export jobs are not implemented.
 
-`ENABLE_ADAPTIVE_PRACTICE` and `ENABLE_AI_GENERATION` are deployment flags. Adaptive delivery additionally requires learner opt-in, current source references and assigned reviewer approval. Generation requires separate consent. `LLM_PROVIDER=fixture` uses only authored synthetic examples; `openai` uses the configured model, token rates and daily reservation ceiling. Imported medical content is never automatically approved. See [adaptive policy and release checklist](docs/phase-4-beta.md).
+`ENABLE_ADAPTIVE_PRACTICE` and `ENABLE_AI_GENERATION` are deployment flags. `ENABLE_SOURCE_PRACTICE=true` on both web and worker enables the Phase 4.5 toggle when those two flags are also enabled on the web. Signed-in learners opt in per timed session; ordinary study stays available to guests and offline. The model selects an explicit source exercise and code compiles its content from the note. These activities have a distinct `source_bounded` state, never medical approval. Broader drafts still require assigned human review, and clinical application is excluded from this learner mode. `LLM_PROVIDER=fixture` supports synthetic notes only; `openai` uses the configured model and existing spend ceiling. See [the exact boundaries and limits](docs/phase-4.5-release.md).
 
 ## Project map
 

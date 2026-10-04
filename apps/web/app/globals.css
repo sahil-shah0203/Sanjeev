@@ -2,15 +2,15 @@
 @import "katex/dist/katex.min.css";
 @source "../components";
 :root {
-  --bg: #f8faf9;
-  --surface: #fff;
-  --text: #172522;
-  --muted: #56645e;
-  --border: #dfe7e2;
+  --bg: #f8f5ef;
+  --surface: #fffdf9;
+  --text: #292e29;
+  --muted: #60635b;
+  --border: #dfd9cd;
   --accent: #12695a;
   --accent-soft: #e8f0eb;
   --danger: #ac352b;
-  --warm: #f1eee4;
+  --warm: #eee6d6;
   --radius: 14px;
   color-scheme: light;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
@@ -87,7 +87,7 @@ input:focus-visible,
 select:focus-visible,
 summary:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #5eaf98;
+  outline: 3px solid var(--accent);
   outline-offset: 4px;
 }
 input,
@@ -192,7 +192,7 @@ kbd {
   inset: 0 auto 0 0;
   width: 238px;
   border-right: 1px solid var(--border);
-  background: #f3f6f3;
+  background: #f0ebdf;
   padding: 34px 22px 16px;
   display: flex;
   flex-direction: column;
@@ -241,7 +241,7 @@ kbd {
   padding: 12px 13px;
   min-height: 46px;
   border-radius: 8px;
-  color: #60706a;
+  color: var(--muted);
   font-size: 14px;
 }
 .nav-link:hover {
@@ -522,8 +522,8 @@ kbd {
   gap: 24px;
 }
 .study-plan {
-  background: #e8eee4;
-  border: 1px solid #d9e3d5;
+  background: var(--warm);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 30px 33px;
   overflow: hidden;
@@ -543,11 +543,11 @@ kbd {
   letter-spacing: -1.2px;
   white-space: pre-line;
   line-height: 1.14;
-  color: #244a39;
+  color: var(--text);
 }
 .study-plan > p {
   font-size: 12px;
-  color: #4f624f;
+  color: var(--muted);
   max-width: 350px;
   margin-top: 15px;
 }
@@ -1661,18 +1661,18 @@ dialog::backdrop {
   margin: 15px 12px 15px 0;
 }
 [data-theme="dark"] {
-  --bg: #121c19;
-  --surface: #1c2924;
-  --text: #e3ece5;
-  --muted: #a6b9ad;
-  --border: #33473b;
+  --bg: #1b1c19;
+  --surface: #272822;
+  --text: #f1eee5;
+  --muted: #c2bfb4;
+  --border: #48483e;
   --accent: #8fc8b2;
   --accent-soft: #273e32;
-  --warm: #393a2a;
+  --warm: #35342c;
   color-scheme: dark;
 }
 [data-theme="dark"] .sidebar {
-  background: #17231d;
+  background: #23241f;
 }
 [data-theme="dark"] .brand-mark,
 [data-theme="dark"] .button.primary {
@@ -1682,13 +1682,18 @@ dialog::backdrop {
 [data-theme="dark"] .nav-link {
   color: #acbdb1;
 }
+[data-theme="dark"] .nav-caption,
+[data-theme="dark"] .app-footer,
+[data-theme="dark"] .note-foot {
+  color: var(--muted);
+}
 [data-theme="dark"] .nav-link.active {
   background: #293e30;
   color: #b9dac6;
 }
 [data-theme="dark"] .study-plan {
-  background: #263c2d;
-  border-color: #3a513e;
+  background: var(--warm);
+  border-color: var(--border);
 }
 [data-theme="dark"] .study-plan h2,
 [data-theme="dark"] .study-plan > p,
@@ -1718,6 +1723,7 @@ dialog::backdrop {
 [data-theme="dark"] .pill {
   background: #273c30;
   border-color: #3c5744;
+  color: #c3dfcb;
 }
 [data-theme="dark"] .notice {
   color: #c3dfcb;
@@ -2298,6 +2304,167 @@ dialog::backdrop {
   *::after {
     animation: none !important;
     transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Phase 4.5: calm paper surfaces and a short path to studying. */
+.topbar .mobile-brand,
+.topbar .mobile-settings,
+.topbar .mobile-account {
+  display: none;
+}
+.topbar-actions {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.simplified-settings {
+  display: block;
+  max-width: 780px;
+}
+.simplified-settings > p {
+  margin-bottom: 24px;
+}
+.ai-choice {
+  margin: 22px 0 4px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.ai-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.ai-switch input {
+  width: 40px;
+  height: 24px;
+  appearance: none;
+  padding: 0;
+  position: relative;
+  border: 1px solid var(--muted);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.ai-switch input::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.ai-switch input:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.ai-switch input:checked::before {
+  left: 19px;
+  background: var(--surface);
+}
+.ai-choice p {
+  font-size: 12px;
+  margin-top: 7px;
+  color: var(--muted);
+}
+.ai-choice a,
+.help-guide a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ai-disclosure {
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+.help-guide {
+  max-width: 780px;
+}
+.help-guide .panel {
+  padding: 28px;
+}
+.help-guide p + p,
+.help-guide ul {
+  margin-top: 12px;
+}
+.help-guide ol {
+  list-style: none;
+  padding: 0;
+  counter-reset: guide;
+}
+.help-guide h2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.help-guide h2::before {
+  counter-increment: guide;
+  content: counter(guide);
+  display: inline-grid;
+  place-items: center;
+  background: var(--warm);
+  color: var(--text);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.help-guide table {
+  width: 100%;
+  margin: 12px 0;
+}
+.source-excerpt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px;
+  margin: 14px 0;
+  background: var(--bg);
+}
+.study-card h2 {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .topbar .mobile-brand,
+  .topbar .mobile-settings,
+  .topbar .mobile-account {
+    display: inline-flex;
+  }
+  .mobile-brand {
+    font-size: 23px;
+    font-weight: 650;
+    letter-spacing: -1px;
+  }
+  .topbar-motto {
+    display: none;
+  }
+  .topbar {
+    gap: 12px;
+  }
+  .mobile-nav {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .plan-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .plan-controls select {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

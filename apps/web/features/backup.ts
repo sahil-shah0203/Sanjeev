@@ -51,7 +51,10 @@ export async function restoreLibrary(db: Library, file: Blob) {
         throw new Error("Another tab added cards. Restore stopped safely.");
       for (const [name, values] of Object.entries(data.tables)) {
         const rows = values.map((v) => {
-          if (name === "activities" && (v as any).status === "human_approved")
+          if (
+            name === "activities" &&
+            ["human_approved", "source_bounded"].includes((v as any).status)
+          )
             return { ...(v as object), status: "quarantined" };
           if (name === "imports") {
             const r = v as ImportReport;

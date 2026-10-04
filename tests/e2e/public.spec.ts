@@ -22,7 +22,7 @@ test("public modern package imports, reopens offline and restores with media", a
     page.getByRole("heading", { name: "Your deck is ready." }),
   ).toBeVisible();
   await page.goto("/");
-  await page.getByRole("button", { name: "Start a session" }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await expect(page.getByTestId("card-face")).toBeVisible();
   if (process.env.TEST_PRODUCTION === "1") {
     await page.evaluate(async () => {
@@ -37,7 +37,7 @@ test("public modern package imports, reopens offline and restores with media", a
   await page.keyboard.press("3");
   await expect(page.getByText(/1 reviewed/)).toBeVisible();
   await context.setOffline(false);
-  await page.goto("/settings");
+  await page.goto("/account");
   const promise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download native backup" }).click();
   const download = await promise;
@@ -46,7 +46,7 @@ test("public modern package imports, reopens offline and restores with media", a
   const clean = await browser.newContext();
   try {
     const restored = await clean.newPage();
-    await restored.goto(`${baseURL}/settings`);
+    await restored.goto(`${baseURL}/account`);
     await restored.getByLabel("Restore native backup").setInputFiles(backup);
     await expect(
       restored.getByText(
@@ -73,7 +73,15 @@ test("mobile and desktop core pages pass automated accessibility checks", async 
     .click();
   for (const width of [390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ["/", "/browse", "/settings", "/progress", "/import"]) {
+    for (const path of [
+      "/",
+      "/browse",
+      "/settings",
+      "/account",
+      "/help",
+      "/progress",
+      "/import",
+    ]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       const result = await new AxeBuilder({ page })
@@ -86,5 +94,15 @@ test("mobile and desktop core pages pass automated accessibility checks", async 
         ),
       ).toBe(true);
     }
+  }
+  await page.goto("/settings");
+  await page.getByLabel("Appearance").selectOption("dark");
+  for (const path of ["/", "/settings", "/account", "/help"]) {
+    await page.goto(path);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    const result = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(result.violations, `${path} in dark mode`).toEqual([]);
   }
 });

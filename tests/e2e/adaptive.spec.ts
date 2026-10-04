@@ -10,7 +10,7 @@ test("approved synthetic check supports uncertainty and self-check without extra
   await page
     .getByRole("button", { name: "Or try 6 demonstration cards" })
     .click();
-  await page.getByRole("button", { name: "Start a session" }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await expect(page.getByTestId("card-face")).toBeVisible();
   const sessionId = page.url().split("/").at(-1)!;
   await page.evaluate(async (sessionId) => {
@@ -70,7 +70,11 @@ test("approved synthetic check supports uncertainty and self-check without extra
       });
     }
     const session = await read(tx.objectStore("sessions").get(sessionId));
-    tx.objectStore("sessions").put({ ...session, reviews: 9 });
+    tx.objectStore("sessions").put({
+      ...session,
+      reviews: 9,
+      aiQuestions: true,
+    });
     tx.objectStore("preferences").put({
       id: "preferences",
       newLimit: 20,

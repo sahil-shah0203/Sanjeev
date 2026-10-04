@@ -134,7 +134,7 @@ export async function mergeImport(
     historyMode: "fresh" as const,
     warnings: [
       ...bundle.report.warnings,
-      "Source update: existing Recall schedules and missing-from-export cards were preserved. New cards start fresh.",
+      "Source update: existing Sanjeev schedules and missing-from-export cards were preserved. New cards start fresh.",
       `${conflicts.length} local source conflicts were preserved for inspection.`,
     ],
   };

@@ -22,6 +22,7 @@ test("production shell reopens an uncached study URL offline and saves an answer
     page.getByText(/All 0 media files are on this device/),
   ).toBeVisible();
   await page.getByRole("button", { name: "Study deck", exact: true }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await expect(page.getByTestId("card-face")).toBeVisible();
   await context.setOffline(true);
   await page.reload();

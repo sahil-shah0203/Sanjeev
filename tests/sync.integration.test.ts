@@ -38,6 +38,8 @@ vi.mock("../apps/web/lib/server/database", () => ({
   },
 }));
 import { push, pull } from "../apps/web/lib/server/sync";
+import { enqueueSourcePractice } from "../apps/web/lib/server/source-practice";
+import { compileSourceActivity } from "@recall/learning";
 const alice = id(),
   bob = id(),
   libraries: Library[] = [];
@@ -81,6 +83,63 @@ async function send(owner: string, db: Library) {
   }
   return receipts;
 }
+it("gates source exercises on session consent, ownership, quotas and server-only publication", async () => {
+  vi.stubEnv("ENABLE_AI_GENERATION", "true");
+  vi.stubEnv("ENABLE_ADAPTIVE_PRACTICE", "true");
+  vi.stubEnv("ENABLE_SOURCE_PRACTICE", "true");
+  try {
+    const db = local(),
+      bundle = await demoBundle();
+    await commitImport(db, bundle);
+    const session = await startSession(db, "", 15, true);
+    await send(alice, db);
+    const input = {
+      sessionId: session.id,
+      noteId: bundle.notes[0].id,
+      variant: "recall" as const,
+      consent: true as const,
+    };
+    const first = await enqueueSourcePractice(alice, input);
+    expect(await enqueueSourcePractice(alice, input)).toEqual(first);
+    await expect(enqueueSourcePractice(bob, input)).rejects.toThrow(
+      "Turn on AI",
+    );
+    await enqueueSourcePractice(alice, { ...input, variant: "restate" });
+    await enqueueSourcePractice(alice, {
+      ...input,
+      noteId: bundle.notes[1].id,
+    });
+    await expect(
+      enqueueSourcePractice(alice, { ...input, noteId: bundle.notes[2].id }),
+    ).rejects.toThrow("limit reached");
+    const a = compileSourceActivity(
+      bundle.notes[0],
+      { unit: 0, variant: "recall" },
+      { id: id(), version: id(), modelVersion: "fixture" },
+    );
+    const forged = await push(alice, {
+      schemaVersion: 1,
+      mutations: [
+        {
+          id: id(),
+          at: new Date().toISOString(),
+          baseVersion: 0,
+          kind: "put",
+          entity: "activities",
+          entityId: a.id,
+          value: a,
+        },
+      ],
+    });
+    expect(forged.results[0].status).toBe("error");
+    vi.stubEnv("ENABLE_SOURCE_PRACTICE", "false");
+    await expect(enqueueSourcePractice(alice, input)).rejects.toThrow(
+      "unavailable",
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 it("syncs actual import outboxes, survives duplicate requests, and isolates cursor pulls", async () => {
   const device = local();
   await commitImport(device, await demoBundle());

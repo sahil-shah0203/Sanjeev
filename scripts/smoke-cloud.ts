@@ -106,12 +106,12 @@ try {
     page.getByRole("heading", { name: "Your deck is ready." }),
   ).toBeVisible();
   await page.goto(origin);
-  await page.getByRole("button", { name: "Start a session" }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await page.getByRole("button", { name: /Show answer/ }).click();
   await page.getByRole("button", { name: /^Good/ }).click();
   await expect(page.getByText(/1 reviewed/)).toBeVisible();
   await login(a, alice);
-  await page.goto(`${origin}/settings`);
+  await page.goto(`${origin}/account`);
   await page
     .getByRole("button", { name: "Bring guest library into this account" })
     .click();
@@ -127,7 +127,7 @@ try {
     "6 cards and first review copied; guest recovery retained";
   await login(b, alice);
   const second = await b.newPage();
-  await second.goto(`${origin}/settings`);
+  await second.goto(`${origin}/account`);
   await expect(
     second.getByText("Synced across your devices", { exact: true }).first(),
   ).toBeVisible({ timeout: 90000 });
@@ -186,14 +186,14 @@ try {
   });
   await b.setOffline(true);
   await second.goto(origin);
-  await second.getByRole("button", { name: "Start a session" }).click();
+  await second.getByRole("button", { name: "Start review" }).click();
   await second.getByRole("button", { name: /Show answer/ }).click();
   await second.getByRole("button", { name: /^Good/ }).click();
   await expect(second.getByText(/1 reviewed/)).toBeVisible();
   await second.reload();
   await expect(second.getByText(/1 reviewed/)).toBeVisible();
   await b.setOffline(false);
-  await second.goto(`${origin}/settings`);
+  await second.goto(`${origin}/account`);
   await second.getByRole("button", { name: "Sync now" }).click();
   await expect
     .poll(async () => (await local(second)).pending, { timeout: 60000 })
@@ -220,6 +220,7 @@ try {
   result.tenantIsolation =
     "Other authenticated account cannot read source documents or request private media";
   if (process.env.SMOKE_GENERATION === "1") {
+    await page.goto(`${origin}/review-content`);
     await page
       .getByRole("checkbox", { name: /Allow selected source excerpts/ })
       .click();

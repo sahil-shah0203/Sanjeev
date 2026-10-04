@@ -24,7 +24,7 @@ export async function demoBundle(): Promise<ImportBundle> {
         text,
         i === 0 ? POLYGON_SOURCE : "Synthetic demonstration card.",
       ],
-      tags: ["Recall::Demo"],
+      tags: ["Sanjeev::Demo"],
       version: await hash(
         JSON.stringify([
           text,
@@ -52,7 +52,7 @@ export async function demoBundle(): Promise<ImportBundle> {
       id: importId,
       namespace,
       hash: await hash("recall-synthetic-demo-v1"),
-      filename: "Recall demonstration",
+      filename: "Sanjeev demonstration",
       bytes: 0,
       format: "Synthetic demo",
       parserVersion: "1",
@@ -84,7 +84,7 @@ export async function demoBundle(): Promise<ImportBundle> {
       {
         id: typeId,
         originalId: "1700000000002",
-        name: "Recall cloze",
+        name: "Sanjeev cloze",
         kind: "cloze",
         fields: ["Text", "Extra"],
         templates: [

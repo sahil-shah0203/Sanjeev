@@ -10,7 +10,7 @@ Owner actions still needed:
 
 - In Supabase Auth, verify Site URL is the beta URL above and Redirect URLs includes `https://recall-sepia-seven.vercel.app/auth/callback`. Configure custom SMTP before inviting friends: development email restrictions can prevent delivery to other addresses. Complete one real hosted email-link sign-in yourself.
 - Rotate the Supabase secret key, OpenAI API key and database password that had been placed in `.env.example`. GitHub rejected that initial push; the published baseline was sanitized. Update the ignored local environment files and the Vercel/Railway secret stores, then redeploy. Never paste these values into tracked files. The new secret guard runs in lint/CI.
-- Assign a qualified reviewer before studying generated medical content. No reviewer was invented or assigned medical authority automatically. The assignment SQL is in `operations.md`.
+- The Phase 4.5 source-only pilot is enabled and needs no reviewer assignment: its model selects source text and code builds a bounded exercise. It does not validate medical truth. Broader clinical generation still requires a qualified reviewer; assignment SQL is in `operations.md`.
 - Choose backup retention and test your Supabase database plus Storage restore procedure. Native app backup/restore does not substitute for an operator recovery drill.
 - Use `beta-testing.md` for friend testing on actual phones, personal histories and representative decks. Their clinical/content review and educational evaluation cannot be completed by automated tests.
 
@@ -20,7 +20,7 @@ The remaining sections explain setup for a fresh checkout or a separate staging 
 
 Run `npm run dev` and open `http://localhost:3000`, or use `npm run build` followed by `npm run start` to test offline mode. Import `forsahil.apkg`. Its three cards are **suspended in the source export**: select **Resume suspended cards on import** if you want to study them immediately. Their suspension is preserved by default.
 
-Download a native backup from Settings after important study sessions. Keep your existing Anki collection until your actual templates/history have passed the compatibility checks.
+Download a native backup from Account & data after important study sessions. Keep your existing Anki collection until your actual templates/history have passed the compatibility checks.
 
 ## 2. Connect Supabase for cloud accounts
 
@@ -34,7 +34,7 @@ Download a native backup from Settings after important study sessions. Keep your
    - `APP_ORIGIN`: the exact browser origin, initially `http://localhost:3000`.
 4. In Supabase Auth, set Site URL and allow `${APP_ORIGIN}/auth/callback`. Configure a production email/SMTP provider before inviting students. Open sign-in links in the browser where sign-in began.
 5. Rebuild/restart the web app after changing `NEXT_PUBLIC_*` values. Confirm the `recall-media` bucket is private and the migrations completed.
-6. Sign in from Settings, choose **Bring guest library into this account**, and wait for acknowledgement. The guest copy remains on this device for recovery.
+6. Sign in from Account & data, choose **Bring guest library into this account**, and wait for acknowledgement. The guest copy remains on this device for recovery.
 
 Official references: [Supabase local development](https://supabase.com/docs/guides/local-development/cli/getting-started), [migrations/deployment](https://supabase.com/docs/guides/deployment/managing-environments), and [Auth redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
 
@@ -55,15 +55,17 @@ The first command starts the app; the second also runs the persistent worker. Pu
 
 The live web app uses Vercel, and Railway runs `Dockerfile.worker` using `.railway/railway.ts`. Temporary synthetic smoke accounts exercise hosted Auth/Storage and are removed after each run. The alternative Docker Compose web stack remains untested locally; see `verification.md` for measured deployment evidence.
 
-## 4. Enable reviewed practice only when ready
+## 4. Optional source-only practice and reviewed drafts
 
-Ordinary review works with both flags false. The beta exposes opt-in practice and generation controls; no generated medical activity is eligible until reviewed. For a controlled pilot:
+Ordinary review works with all AI flags false. The deployed Phase 4.5 pilot uses `ENABLE_SOURCE_PRACTICE=true` on web and worker, plus `ENABLE_ADAPTIVE_PRACTICE` and `ENABLE_AI_GENERATION` on web. A signed-in learner chooses **AI-generated questions based on your deck** on Today before a timed session. The switch starts off each session. Expect at most one extra exercise after ten original reviews, subject to time and source eligibility. No Settings AI checkboxes are needed. [Exact scope and limits](phase-4.5-release.md) explain the source-only compiler, provider disclosure, self-check and quarantine. Set `ENABLE_SOURCE_PRACTICE=false` to disable this pilot.
+
+For broader reviewer-authored/generated drafts, the protected `/review-content` workflow remains separate:
 
 1. Assign a qualified reviewer to each collection. Use the SQL template in [operations](operations.md); this is an administrator action, not a browser permission.
-2. Turn on `ENABLE_ADAPTIVE_PRACTICE=true` on the web service once approved activities exist. A learner must also opt in from Settings.
+2. Turn on `ENABLE_ADAPTIVE_PRACTICE=true` on the web service once approved activities exist. Delivery also requires session opt-in; unreviewed clinical application remains excluded from the learner mode.
 3. Reviewers can author drafts through **Write a draft** without a model. For generation, verify the chosen provider/model's current availability, token prices, privacy/retention terms, and your intended data use. Set `LLM_PROVIDER=openai`, `LLM_MODEL`, `LLM_API_KEY`, the two per-million token prices, and a positive daily spend limit on the worker. Enable `ENABLE_AI_GENERATION=true` on web and worker.
 4. Sign in, consent to selected-source processing, select one source note, and request a draft. `LLM_PROVIDER=fixture` supports all task/format combinations for the authored polygon example and simple recall for the remaining synthetic demo facts; it abstains on medical sources. Live model availability and results are recorded in `verification.md`.
-5. The assigned reviewer checks fidelity **and** medical correctness/currentness, edits the item, supplies the answer/rationale/rubric, and approves it. All cognitive tasks are review-gated. Reporting or source changes quarantine practice.
+5. The assigned reviewer checks fidelity **and** medical correctness/currentness, edits the draft, supplies the answer/rationale/rubric, and approves it. These broader drafts are review-gated; `source_bounded` never means `human_approved`. Reporting or source changes quarantine practice.
 
 ## 5. Complete the live release checks
 

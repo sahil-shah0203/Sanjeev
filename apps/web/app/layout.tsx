@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Recall — your study space",
+  title: "Sanjeev — your study space",
   description:
-    "A focused, local-first space for your Anki decks. Recall, understand, and come back tomorrow.",
+    "A focused, local-first space for your Anki decks. Review with FSRS and optionally practice from your source notes.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/favicon.svg", apple: "/favicon.svg" },
 };

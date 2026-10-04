@@ -11,7 +11,7 @@ export default defineRailway(() => {
     healthcheckTimeout: 120,
     build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile.worker" },
     env: {
-      DATABASE_URL: preserve(), ENABLE_AI_GENERATION: preserve(),
+      DATABASE_URL: preserve(), ENABLE_AI_GENERATION: preserve(), ENABLE_SOURCE_PRACTICE: preserve(),
       LLM_API_KEY: preserve(), LLM_DAILY_SPEND_LIMIT: preserve(),
       LLM_INPUT_USD_PER_MILLION: preserve(), LLM_OUTPUT_USD_PER_MILLION: preserve(),
       LLM_MODEL: preserve(), LLM_PROVIDER: preserve(), NODE_ENV: preserve(),

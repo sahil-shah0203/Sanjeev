@@ -28,7 +28,7 @@ export async function enqueueGeneration(
       throw new HttpError(
         403,
         "CONSENT_REQUIRED",
-        "Enable selected-source AI processing in Settings before requesting generation.",
+        "Enable selected-source processing in the content review workspace before requesting a reviewer draft.",
       );
     const note = (
       await db.query(

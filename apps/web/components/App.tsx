@@ -8,8 +8,8 @@ import {
   LibraryBig,
   Search,
   Settings,
-  Upload,
-  Cloud,
+  CircleHelp,
+  UserRound,
   ArrowUpRight,
 } from "lucide-react";
 import LibraryProvider, { useLibrary } from "./LibraryProvider";
@@ -20,12 +20,14 @@ import Study from "./views/Study";
 import Browse from "./views/Browse";
 import Progress from "./views/Progress";
 import SettingsView from "./views/Settings";
+import Help from "./views/Help";
 import ContentReview from "./views/ContentReview";
 const nav = [
   { href: "/", label: "Today", icon: CalendarDays },
   { href: "/decks", label: "Decks", icon: LibraryBig },
   { href: "/browse", label: "Browse", icon: Search },
   { href: "/progress", label: "Progress", icon: ChartNoAxesCombined },
+  { href: "/help", label: "Help", icon: CircleHelp },
 ];
 function Shell() {
   const routedPath = usePathname();
@@ -44,7 +46,7 @@ function Shell() {
           <span className="brand-mark">
             <BookOpen size={23} />
           </span>
-          recall<span className="brand-dot">.</span>
+          Sanjeev
         </Link>
         <p className="nav-caption">YOUR STUDY SPACE</p>
         <nav aria-label="Main navigation">
@@ -65,10 +67,6 @@ function Shell() {
             </Link>
           ))}
         </nav>
-        <Link href="/import" className="import-nav">
-          <Upload size={17} />
-          Import a deck
-        </Link>
         <div className="sidebar-bottom">
           <div className="device-note">
             <span className="status-dot" />
@@ -78,15 +76,13 @@ function Shell() {
             <Settings size={19} />
             Settings
           </Link>
-          <Link href="/settings#account" className="account-row">
+          <Link href="/account" className="account-row">
             <span className="avatar">
               {user?.email?.slice(0, 1).toUpperCase() ?? "G"}
             </span>
             <span>
               <strong>{user?.email?.split("@")[0] ?? "Guest workspace"}</strong>
-              <small>
-                {user ? "Account & recovery" : "Save across devices"}
-              </small>
+              <small>Account & data</small>
             </span>
             <ArrowUpRight size={15} />
           </Link>
@@ -94,11 +90,23 @@ function Shell() {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <span>Make room for what matters.</span>
-          <Link href="/settings#account">
-            <Cloud size={15} />
-            {user ? "Your account" : "Local workspace"}
+          <Link href="/" className="mobile-brand">
+            Sanjeev
           </Link>
+          <span className="topbar-motto">Your cards. Your next step.</span>
+          <div className="topbar-actions">
+            <Link
+              href="/settings"
+              aria-label="Settings"
+              className="mobile-settings"
+            >
+              <Settings size={18} />
+            </Link>
+            <Link href="/account" className="mobile-account">
+              <UserRound size={15} />
+              Account & data
+            </Link>
+          </div>
         </header>
         <main id="main">
           {path === "/import" ? (
@@ -109,8 +117,12 @@ function Shell() {
             <Browse />
           ) : path === "/progress" ? (
             <Progress />
+          ) : path === "/help" ? (
+            <Help />
+          ) : path === "/account" ? (
+            <SettingsView key="account" account />
           ) : path === "/settings" ? (
-            <SettingsView />
+            <SettingsView key="preferences" />
           ) : path === "/review-content" ? (
             <ContentReview />
           ) : (
@@ -118,7 +130,7 @@ function Shell() {
           )}
         </main>
         <footer className="app-footer">
-          <span>A little recall. A little more understanding.</span>
+          <span>Sanjeev · built around your study day.</span>
           <span>Beta · your progress stays yours.</span>
         </footer>
       </div>
@@ -134,10 +146,6 @@ function Shell() {
             <span>{n.label}</span>
           </Link>
         ))}
-        <Link href="/settings" aria-label="Settings">
-          <Settings size={20} />
-          <span>Settings</span>
-        </Link>
       </nav>
     </div>
   );

@@ -12,6 +12,7 @@ import {
 import { stripHtml } from "@recall/card-renderer";
 import { useLibrary } from "../LibraryProvider";
 import { PageTitle, Notice, Busy } from "../ui";
+import { savePreferences } from "../../lib/db/local";
 export default function ContentReview() {
   const { db, user, prefs, sync } = useLibrary();
   const [error, setError] = useState("");
@@ -178,7 +179,7 @@ export default function ContentReview() {
       <PageTitle
         eyebrow="SOURCE-GROUNDED PRACTICE"
         title="Review before release."
-        description="Source fidelity and medical correctness are separate checks. Only approved versions reach a learner."
+        description="Review broader authored content and resolve reports. Source exercises remain explicitly unverified."
       />
       {error && <Notice error>{error}</Notice>}
       {message && <Notice>{message}</Notice>}
@@ -191,6 +192,24 @@ export default function ContentReview() {
         <>
           <section className="panel">
             <h2>Request one draft</h2>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={prefs.aiConsent}
+                onChange={async (e) => {
+                  try {
+                    await savePreferences(db, {
+                      ...prefs,
+                      aiConsent: e.target.checked,
+                    });
+                  } catch (error) {
+                    setError(errorMessage(error));
+                  }
+                }}
+              />
+              Allow selected source excerpts to be processed for reviewer drafts
+              and rubric feedback
+            </label>
             <p>
               Only the selected source note is processed. Insufficient support
               returns an abstention.

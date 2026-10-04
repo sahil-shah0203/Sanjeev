@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     const client = await serverAuth();
     const { error } = await client.auth.exchangeCodeForSession(code);
     if (!error)
-      return NextResponse.redirect(new URL("/settings?connected=1", origin));
+      return NextResponse.redirect(new URL("/account?connected=1", origin));
   }
-  return NextResponse.redirect(new URL("/settings?authError=1", origin));
+  return NextResponse.redirect(new URL("/account?authError=1", origin));
 }

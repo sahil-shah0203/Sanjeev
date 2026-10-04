@@ -35,6 +35,8 @@ export async function buildOfflineShell(
     "/browse",
     "/progress",
     "/settings",
+    "/account",
+    "/help",
     "/import",
     "/review-content",
     "/study/offline",

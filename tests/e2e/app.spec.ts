@@ -15,13 +15,15 @@ test("sample import, keyboard review, reload, backup and restore", async ({
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "A fresh space to remember." }),
+    page.getByRole("heading", { name: "Ready for your next review?" }),
   ).toBeVisible();
   await page.screenshot({
     path: "test-results/recall-today.png",
     fullPage: true,
   });
-  await page.getByRole("link", { name: "Import deck", exact: true }).click();
+  await page
+    .getByRole("link", { name: "Import an Anki deck", exact: true })
+    .click();
   await page
     .getByLabel("Choose Anki package")
     .setInputFiles(path.resolve("forsahil.apkg"));
@@ -38,7 +40,7 @@ test("sample import, keyboard review, reload, backup and restore", async ({
     page.getByRole("heading", { name: "Your deck is ready." }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Go to Today" }).click();
-  await page.getByRole("button", { name: "Start a session" }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await expect(page.getByTestId("card-face")).toBeVisible();
   if (process.env.TEST_PRODUCTION === "1") {
     await page.evaluate(async () => {
@@ -98,7 +100,7 @@ test("sample import, keyboard review, reload, backup and restore", async ({
   await expect(
     page.getByRole("heading", { name: "Session finished." }),
   ).toBeVisible();
-  await page.goto("/settings");
+  await page.goto("/account");
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download native backup" }).click();
   const download = await downloadPromise;
@@ -106,7 +108,7 @@ test("sample import, keyboard review, reload, backup and restore", async ({
   await download.saveAs(backup);
   const clean = await browser.newContext();
   const restored = await clean.newPage();
-  await restored.goto(`${baseURL}/settings`);
+  await restored.goto(`${baseURL}/account`);
   await restored.getByLabel("Restore native backup").setInputFiles(backup);
   await expect(
     restored.getByText(
@@ -131,7 +133,7 @@ test("demo, editing, undo, responsive layout and no-attempt exposures", async ({
     .getByRole("button", { name: "Or try 6 demonstration cards" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Start a session" }),
+    page.getByRole("button", { name: "Start review" }),
   ).toBeEnabled();
   await page.screenshot({
     path: "test-results/recall-mobile.png",
@@ -142,7 +144,7 @@ test("demo, editing, undo, responsive layout and no-attempt exposures", async ({
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole("button", { name: "Start a session" }).click();
+  await page.getByRole("button", { name: "Start review" }).click();
   await page.getByRole("button", { name: /Show answer/ }).click();
   await page.getByRole("button", { name: /^Good/ }).click();
   await page.getByRole("button", { name: /Undo/ }).click();

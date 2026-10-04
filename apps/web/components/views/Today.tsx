@@ -9,7 +9,6 @@ import {
   BookOpen,
   Clock3,
   Layers,
-  Upload,
   Check,
   ArrowUpRight,
   Sprout,
@@ -18,14 +17,19 @@ import { useLibrary } from "../LibraryProvider";
 import { commitImport, eligibleCards, startSession } from "../../lib/db/local";
 import { studyDay } from "@recall/scheduler";
 import { demoBundle } from "../../features/demo";
+import AiStudyToggle from "../AiStudyToggle";
 import { PageTitle, Notice } from "../ui";
 export default function Today() {
   const { db, prefs } = useLibrary();
+  const [ai, setAi] = useState(false);
   const tick = useClock();
   const router = useRouter();
   const [budget, setBudget] = useState(prefs.budgetMinutes);
   useEffect(() => setBudget(prefs.budgetMinutes), [prefs.budgetMinutes]);
   const [scope, setScope] = useState("");
+  useEffect(() => {
+    setScope(new URLSearchParams(location.search).get("deck") ?? "");
+  }, []);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const decks = useLiveQuery(() => db.decks.toArray(), [db]) ?? [];
@@ -58,7 +62,7 @@ export default function Today() {
   const begin = async () => {
     setBusy(true);
     try {
-      const session = await startSession(db, scope, budget);
+      const session = await startSession(db, scope, budget, ai);
       router.push(`/study/${session.id}`);
     } catch (e) {
       setError(String(e));
@@ -86,14 +90,8 @@ export default function Today() {
         })
           .format(new Date())
           .toUpperCase()}
-        title="A fresh space to remember."
-        description="Pick up where you left off. Keep your next step small."
-        action={
-          <Link className="button secondary" href="/import">
-            <Upload size={16} />
-            Import deck
-          </Link>
-        }
+        title="Ready for your next review?"
+        description="Choose your deck, make a little time, and begin."
       />
       {error && <Notice error>{error}</Notice>}
       <div className="today-grid">
@@ -107,7 +105,7 @@ export default function Today() {
           </div>
           <h2>
             {cards.length
-              ? "A little practice,\na lasting habit."
+              ? "Your next review."
               : "Your cards.\nA clearer routine."}
           </h2>
           <p>
@@ -158,13 +156,14 @@ export default function Today() {
                   </div>
                 </fieldset>
               </div>
+              <AiStudyToggle checked={ai} onChange={setAi} budget={budget} />
               <button
                 className="button primary plan-start"
                 disabled={busy || due.length + fresh.length === 0}
                 onClick={begin}
               >
                 {due.length + fresh.length
-                  ? "Start a session"
+                  ? "Start review"
                   : "You’re up to date"}
                 <ArrowRight size={18} />
               </button>
@@ -246,54 +245,66 @@ export default function Today() {
           </section>
         </div>
       </div>
-      <section className="deck-section">
-        <div className="section-heading">
-          <h2>
-            Your library{" "}
-            <span className="count-chip">
-              {decks.filter((d) => cards.some((c) => c.deckId === d.id)).length}
-            </span>
-          </h2>
-          <Link href="/decks" className="text-link">
-            View all decks
-            <ArrowRight size={15} />
-          </Link>
-        </div>
-        {cards.length ? (
-          <div className="deck-cards">
-            {decks
-              .filter((d) => cards.some((c) => c.deckId === d.id))
-              .slice(0, 3)
-              .map((d) => (
-                <Link key={d.id} href={`/decks/${d.id}`} className="deck-tile">
-                  <span className="deck-icon">
-                    <Layers size={22} />
-                  </span>
-                  <h3>{d.name.split("::").at(-1)}</h3>
-                  <p>{cards.filter((c) => c.deckId === d.id).length} cards</p>
-                  <div>
-                    <span>
-                      {eligible.filter((c) => c.card.deckId === d.id).length}{" "}
-                      available now
-                    </span>
-                    <ArrowUpRight size={17} />
-                  </div>
-                </Link>
-              ))}
+      {cards.length > 0 && (
+        <section className="deck-section">
+          <div className="section-heading">
+            <h2>
+              Your library{" "}
+              <span className="count-chip">
+                {
+                  decks.filter((d) => cards.some((c) => c.deckId === d.id))
+                    .length
+                }
+              </span>
+            </h2>
+            <Link href="/decks" className="text-link">
+              View all decks
+              <ArrowRight size={15} />
+            </Link>
           </div>
-        ) : (
-          <Link className="empty-library" href="/import">
-            <span className="deck-icon">
-              <Layers size={23} />
-            </span>
-            <div>
-              <h3>Your next chapter starts here.</h3>
-              <p>Import a .apkg file to build your personal library.</p>
+          {cards.length ? (
+            <div className="deck-cards">
+              {decks
+                .filter((d) => cards.some((c) => c.deckId === d.id))
+                .slice(0, 3)
+                .map((d) => (
+                  <Link
+                    key={d.id}
+                    href={`/decks/${d.id}`}
+                    className="deck-tile"
+                  >
+                    <span className="deck-icon">
+                      <Layers size={22} />
+                    </span>
+                    <h3>{d.name.split("::").at(-1)}</h3>
+                    <p>{cards.filter((c) => c.deckId === d.id).length} cards</p>
+                    <div>
+                      <span>
+                        {eligible.filter((c) => c.card.deckId === d.id).length}{" "}
+                        available now
+                      </span>
+                      <ArrowUpRight size={17} />
+                    </div>
+                  </Link>
+                ))}
             </div>
-            <ArrowRight size={20} />
-          </Link>
-        )}
-      </section>
+          ) : (
+            <Link className="empty-library" href="/import">
+              <span className="deck-icon">
+                <Layers size={23} />
+              </span>
+              <div>
+                <h3>Your next chapter starts here.</h3>
+                <p>Import a .apkg file to build your personal library.</p>
+              </div>
+              <ArrowRight size={20} />
+            </Link>
+          )}
+        </section>
+      )}
+      <Link href="/help" className="text-link">
+        New here? See the 2-minute guide <ArrowRight size={15} />
+      </Link>
     </>
   );
 }

@@ -7,6 +7,15 @@ import {
   type ReviewEvent,
 } from "@recall/domain";
 import { stripHtml } from "@recall/card-renderer";
+export {
+  compileSourceActivity,
+  validSourceActivity,
+  sourceBudgetFits,
+  sourceUnits,
+  sourceVariants,
+  SOURCE_PRACTICE_VERSION,
+  type SourceVariant,
+} from "./source-practice";
 export function eligibleActivity(
   activity: Activity,
   session: StudySession,
@@ -108,6 +117,12 @@ export function deterministicGrade(
 ): { grade: Grade; feedback: string } {
   const normalize = (s: string) =>
     s.normalize("NFC").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+  if (a.sourceRecipe && a.format !== "multiple_choice")
+    return {
+      grade: "uncertain",
+      feedback:
+        "Self-check with the source below. This response is saved as practice, not a medical correctness grade.",
+    };
   if (a.format === "multiple_choice")
     return {
       grade: a.correctOptionIds?.includes(answer) ? "correct" : "incorrect",

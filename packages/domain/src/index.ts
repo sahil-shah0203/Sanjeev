@@ -197,6 +197,8 @@ export interface StudySession {
   seed: string;
   policy: string;
   interventions?: Intervention[];
+  aiQuestions?: boolean;
+  aiRequests?: number;
 }
 export interface Intervention {
   id: string;
@@ -280,12 +282,19 @@ export const ActivitySchema = z.object({
     "human_approved",
     "rejected",
     "quarantined",
+    "source_bounded",
   ]),
   modelVersion: z.string().nullable(),
   promptVersion: z.string(),
   validatorVersion: z.string(),
   reviewerId: z.string().optional(),
   approvedHash: z.string().optional(),
+  sourceRecipe: z
+    .object({
+      unit: z.number().int().nonnegative(),
+      variant: z.enum(["recall", "recognition", "compare", "restate"]),
+    })
+    .optional(),
 });
 export type Activity = z.infer<typeof ActivitySchema>;
 export type Grade = "correct" | "partially_correct" | "incorrect" | "uncertain";
@@ -540,6 +549,8 @@ export const recordSchemas = {
     completed: z.boolean(),
     seed: key,
     policy: key,
+    aiQuestions: z.boolean().optional(),
+    aiRequests: z.number().int().min(0).max(3).optional(),
     interventions: z
       .array(
         z.object({

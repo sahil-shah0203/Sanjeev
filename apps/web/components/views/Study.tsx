@@ -29,7 +29,11 @@ import {
 import { clozeCount, oneByOne } from "@recall/card-renderer";
 import { useClock } from "../../features/useClock";
 import { intervalLabel, preview } from "@recall/scheduler";
-import { selectActivity } from "@recall/learning";
+import { sourceUnits, selectActivity } from "@recall/learning";
+import {
+  prepareSourcePractice,
+  selectSourcePractice,
+} from "../../features/source-practice";
 import {
   openIntervention,
   checkpointIntervention,
@@ -52,7 +56,7 @@ import AttemptFeedback from "../AttemptFeedback";
 type Item = { card: SourceCard; state: CardState; note: Note; type: NoteType };
 const ratings: RecallRating[] = ["again", "hard", "good", "easy"];
 export default function Study() {
-  const { db, prefs, syncStatus, features } = useLibrary();
+  const { db, syncStatus, features, user } = useLibrary();
   const routedPath = usePathname();
   const path =
     typeof window === "undefined" ? routedPath : window.location.pathname;
@@ -83,6 +87,9 @@ export default function Study() {
   const [elapsed, setElapsed] = useState(0);
   const [helpNotice, setHelpNotice] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
+  const [aiNotice, setAiNotice] = useState("");
+  const aiController = useRef<AbortController | null>(null);
+  const requestedSlots = useRef(new Set<number>());
   const exposureId = useRef("");
   const eventId = useRef(id());
   const activeMs = useRef(0);
@@ -133,6 +140,35 @@ export default function Study() {
       .catch((e) => setError(errorMessage(e)));
   }, [db, sessionId, load]);
   useEffect(() => {
+    const controller = new AbortController();
+    aiController.current = controller;
+    return () => controller.abort();
+  }, [sessionId]);
+  useEffect(() => {
+    if (
+      !session?.aiQuestions ||
+      session.completed ||
+      !features.sourcePractice ||
+      !user ||
+      !item ||
+      !navigator.onLine
+    )
+      return;
+    const slot = Math.floor(session.reviews / 10);
+    if (
+      slot >= 3 ||
+      requestedSlots.current.has(slot) ||
+      !sourceUnits(item.note).length
+    )
+      return;
+    requestedSlots.current.add(slot);
+    const signal = aiController.current?.signal;
+    if (!signal) return;
+    void prepareSourcePractice(db, sessionId, item.note, signal).catch((e) => {
+      if (!signal.aborted) setAiNotice(errorMessage(e));
+    });
+  }, [db, sessionId, session, item, features.sourcePractice, user]);
+  useEffect(() => {
     if (!intervention) return;
     const timer = setInterval(() => {
       setElapsed(activeMs.current);
@@ -142,7 +178,7 @@ export default function Study() {
         intervention.id,
         activeMs.current,
       ).catch((e) => setError(errorMessage(e)));
-    }, 5000);
+    }, 1000);
     return () => clearInterval(timer);
   }, [db, sessionId, intervention]);
   useEffect(() => {
@@ -285,48 +321,55 @@ export default function Study() {
       setLastCard(item.card.id);
       await load();
       const updated = await db.sessions.get(session.id);
-      if (prefs.adaptive && features.adaptive && updated) {
+      if (updated?.aiQuestions && features.adaptive) {
         const queue = await eligibleCards(db, updated);
-        {
-          const notes = await db.notes.toArray();
-          const recentExposures = await db.exposures
-            .where("at")
-            .above(
-              new Date(
-                Math.min(
-                  Date.parse(updated.startedAt),
-                  Date.now() - 30 * 60000,
+        const learningDue = queue.some(
+          (q) => q.state.memory.state === 1 || q.state.memory.state === 3,
+        );
+        if (
+          !learningDue &&
+          queue.filter((q) => q.state.memory.reps > 0).length <= 100
+        ) {
+          const bounded = features.sourcePractice
+            ? await selectSourcePractice(db, updated.id, item.note.id)
+            : undefined;
+          const reviewed = !bounded
+            ? selectActivity({
+                session: updated,
+                notes: await db.notes.toArray(),
+                activities: (await db.activities.toArray()).filter(
+                  (a) => a.cognitiveTask !== "apply",
                 ),
-              ).toISOString(),
-            )
-            .toArray();
-          const exposed = new Set(recentExposures.map((e) => e.noteId));
-          exposed.add(item.note.id);
-          const candidates = await db.activities.toArray();
-          const candidate = selectActivity({
-            session: updated,
-            notes,
-            activities: candidates,
-            exposedNoteIds: exposed,
-            overdue: queue.filter((q) => q.state.memory.reps > 0).length,
-            learningDue: queue.some(
-              (q) => q.state.memory.state === 1 || q.state.memory.state === 3,
-            ),
-            reviews: await db.reviews.toArray(),
-            attempts: await db.attempts.toArray(),
-            at: now(),
-          });
+                exposedNoteIds: new Set(
+                  (
+                    await db.exposures
+                      .filter(
+                        (e) =>
+                          e.sessionId === updated.id ||
+                          Date.parse(e.at) > Date.now() - 30 * 60000,
+                      )
+                      .toArray()
+                  ).map((e) => e.noteId),
+                ),
+                overdue: queue.filter((q) => q.state.memory.reps > 0).length,
+                learningDue,
+                reviews: await db.reviews.toArray(),
+                attempts: await db.attempts.toArray(),
+                at: now(),
+              })
+            : undefined;
+          const candidate = bounded ?? reviewed?.activity;
           if (candidate) {
             const entry = await openIntervention(
               db,
               updated.id,
-              candidate.activity,
-              candidate.reason,
+              candidate,
+              "A brief source exercise after ten original reviews.",
             );
             activeMs.current = 0;
             setElapsed(0);
             setIntervention(entry);
-            setActivity(candidate.activity);
+            setActivity(candidate);
           }
         }
       }
@@ -430,49 +473,12 @@ export default function Study() {
       locked.current = false;
     }
   };
-  const requestHelp = async () => {
-    if (!item || !session || locked.current) return;
-    locked.current = true;
-    try {
-      const candidate = selectActivity({
-        session,
-        notes: await db.notes.toArray(),
-        activities: await db.activities.toArray(),
-        reviews: [],
-        attempts: [],
-        exposedNoteIds: new Set(),
-        overdue: 0,
-        learningDue: false,
-        at: now(),
-        requestedNoteId: item.note.id,
-      });
-      if (candidate) {
-        const entry = await openIntervention(
-          db,
-          session.id,
-          candidate.activity,
-          candidate.reason,
-          true,
-        );
-        activeMs.current = 0;
-        setElapsed(0);
-        setIntervention(entry);
-        setActivity(candidate.activity);
-      } else {
-        await recordExposure(db, item.card, session.id, "source");
-        setRevealed(true);
-        setAttempted(false);
-        attemptedRef.current = false;
-        setHelpNotice(
-          "No reviewed explanation is available for this source. Read the original answer below, edit or report the card if needed, and return to review. This is an exposure, not a recall success.",
-        );
-      }
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      locked.current = false;
+  useEffect(() => {
+    if (activity?.sourceRecipe && elapsed >= activity.expectedSeconds * 1000) {
+      void clearActivity();
+      setAiNotice("Extra practice time is complete. Continue with your cards.");
     }
-  };
+  }, [activity, elapsed]);
   const intervals = item ? preview(item.state, now()) : null;
   const budgetReached =
     !!session &&
@@ -487,7 +493,7 @@ export default function Study() {
         </Link>
         <span className="study-brand">
           <BookOpen size={20} />
-          recall.
+          Sanjeev
         </span>
         <span className="save-state">
           <span className="status-dot" />
@@ -496,6 +502,25 @@ export default function Study() {
       </header>
       <main className="study-main">
         {error && <Notice error>{error}</Notice>}
+        {aiNotice && <Notice>{aiNotice}</Notice>}
+        {session?.aiQuestions && !finished && (
+          <div className="study-ai-status">
+            <span className="muted">
+              AI questions on · occasional, optional practice
+            </span>{" "}
+            <button
+              className="text-button"
+              onClick={async () => {
+                aiController.current?.abort();
+                await updateSession(db, session.id, { aiQuestions: false });
+                await clearActivity();
+                setAiNotice("AI questions off for this session.");
+              }}
+            >
+              Turn off
+            </button>
+          </div>
+        )}
         {!loaded && !error ? (
           <Busy text="Opening your session…" />
         ) : finished || (!item && !activity) ? (
@@ -546,12 +571,20 @@ export default function Study() {
         ) : activity ? (
           <section className="study-card">
             <p className="eyebrow">
-              OPTIONAL · {activity.cognitiveTask.toUpperCase()}
+              {activity.sourceRecipe
+                ? "AI-GENERATED · UNVERIFIED"
+                : "OPTIONAL PRACTICE"}
             </p>
             <h2>{activity.stem}</h2>
+            {activity.sourceRecipe && (
+              <p className="muted">
+                Check against your original source; it may contain errors. This
+                practice never changes your card schedule.
+              </p>
+            )}
             <p className="muted">
-              {intervention?.reason} Suggested time: {activity.expectedSeconds}{" "}
-              seconds. You can stop at any time.
+              A short exercise from your note · up to {activity.expectedSeconds}{" "}
+              seconds. Skip any time.
             </p>
             {elapsed >= activity.expectedSeconds * 1000 && (
               <Notice>
@@ -560,7 +593,27 @@ export default function Study() {
               </Notice>
             )}
             <button className="text-button" onClick={clearActivity}>
-              Return to ordinary review
+              Skip and return to review
+            </button>
+            <button
+              className="text-button"
+              onClick={async () => {
+                try {
+                  await reportContent(db, {
+                    id: id(),
+                    activityId: activity.id,
+                    category: "possible_source_error",
+                    comment: "Learner reported a source exercise",
+                    at: now(),
+                    status: "open",
+                  });
+                  await clearActivity();
+                } catch (e) {
+                  setError(errorMessage(e));
+                }
+              }}
+            >
+              Report question
             </button>
             {!adaptiveResult ? (
               <>
@@ -606,7 +659,10 @@ export default function Study() {
                   {adaptiveResult.feedback}
                 </Notice>
                 <p>{activity.rationale}</p>
-                <AttemptFeedback attempt={adaptiveResult} />
+                <AttemptFeedback
+                  attempt={adaptiveResult}
+                  sourceOnly={!!activity.sourceRecipe}
+                />
                 {activity.rubric && (
                   <ul>
                     {activity.rubric.map((r) => (
@@ -620,7 +676,15 @@ export default function Study() {
                 <details>
                   <summary>Source support</summary>
                   {activity.sources.map((s, i) => (
-                    <blockquote key={i}>{s.quote}</blockquote>
+                    <div key={i}>
+                      <small>
+                        Note {s.noteId.slice(0, 8)} · field {s.field + 1} ·
+                        version {s.version.slice(0, 8)}
+                      </small>
+                      <blockquote className="source-excerpt">
+                        {s.quote}
+                      </blockquote>
+                    </div>
                   ))}
                 </details>
                 <button className="button primary" onClick={clearActivity}>
@@ -647,22 +711,6 @@ export default function Study() {
                 >
                   Dispute grade
                 </button>
-                <button
-                  className="text-button"
-                  onClick={async () => {
-                    await reportContent(db, {
-                      id: id(),
-                      activityId: activity.id,
-                      category: "possible_medical_error",
-                      comment: "Reported during practice",
-                      at: now(),
-                      status: "open",
-                    });
-                    clearActivity();
-                  }}
-                >
-                  Report question
-                </button>
               </>
             )}
           </section>
@@ -670,15 +718,6 @@ export default function Study() {
           item && (
             <>
               {helpNotice && <Notice>{helpNotice}</Notice>}
-              {features.adaptive && (
-                <button
-                  className="text-button"
-                  onClick={requestHelp}
-                  disabled={busy}
-                >
-                  I don’t understand · optional deeper study
-                </button>
-              )}
               {budgetReached && (
                 <Notice>
                   Your planned time is complete.{" "}
@@ -689,7 +728,7 @@ export default function Study() {
                 </Notice>
               )}
               <div className="study-meta">
-                <span className="pill">RECALL</span>
+                <span className="pill">CARD REVIEW</span>
                 <span>
                   {session?.reviews ?? 0} reviewed
                   {session?.budgetMinutes

@@ -257,6 +257,7 @@ export async function startSession(
   db: Library,
   deckId: string,
   budgetMinutes: number,
+  aiQuestions = false,
 ): Promise<StudySession> {
   const at = now();
   const s: StudySession = {
@@ -274,6 +275,8 @@ export async function startSession(
     completed: false,
     seed: id(),
     policy: "recall-1",
+    aiQuestions: aiQuestions && budgetMinutes >= 5,
+    aiRequests: 0,
   };
   await db.transaction("rw", db.sessions, db.outbox, async () => {
     await db.sessions.put(s);

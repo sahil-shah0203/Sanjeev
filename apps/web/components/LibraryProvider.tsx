@@ -17,7 +17,12 @@ type Context = {
   prefs: Preferences;
   user: { id: string; email?: string } | null;
   syncStatus: string;
-  features: { adaptive: boolean; generation: boolean };
+  features: {
+    adaptive: boolean;
+    generation: boolean;
+    sourcePractice: boolean;
+    provider: string;
+  };
   sync: () => Promise<void>;
 };
 const LibraryContext = createContext<Context | null>(null);
@@ -41,6 +46,8 @@ function Ready({
   const [features, setFeatures] = useState({
     adaptive: false,
     generation: false,
+    sourcePractice: false,
+    provider: "the configured provider",
   });
   useEffect(() => {
     let active = true;
@@ -54,6 +61,11 @@ function Ready({
         const checked = {
           adaptive: value.adaptive === true,
           generation: value.generation === true,
+          sourcePractice: value.sourcePractice === true,
+          provider:
+            value.provider === "OpenAI"
+              ? "OpenAI"
+              : "the synthetic fixture provider",
         };
         await db.meta.put({ id: "deployment-features", value: checked });
         if (active) setFeatures(checked);

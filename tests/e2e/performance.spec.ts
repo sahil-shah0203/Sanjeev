@@ -13,7 +13,7 @@ test("browse searches 50,000 synthetic cards with bounded DOM output", async ({
     .getByRole("button", { name: "Or try 6 demonstration cards" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Start a session" }),
+    page.getByRole("button", { name: "Start review" }),
   ).toBeEnabled();
   await page.evaluate(async () => {
     const request = indexedDB.open(

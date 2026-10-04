@@ -10,6 +10,8 @@ import {
   deterministicGrade,
   eligibleActivity,
   validateActivity,
+  validSourceActivity,
+  sourceBudgetFits,
 } from "@recall/learning";
 import { Library, enqueue } from "../lib/db/local";
 
@@ -27,14 +29,16 @@ export async function openIntervention(
       const session = await db.sessions.get(sessionId);
       const current = await db.activities.get(activity.id);
       const notes = await db.notes.toArray();
+      const bounded = !!current && validSourceActivity(current, notes);
       if (
         !session ||
         session.completed ||
         !current ||
         current.version !== activity.version ||
-        current.status !== "human_approved" ||
-        !current.reviewerId ||
-        !current.approvedHash ||
+        (!bounded &&
+          (current.status !== "human_approved" ||
+            !current.reviewerId ||
+            !current.approvedHash)) ||
         validateActivity(current, notes).length
       )
         throw new Error(
@@ -50,14 +54,19 @@ export async function openIntervention(
         )
         .toArray();
       if (
-        !requested &&
-        !eligibleActivity(
-          current,
-          session,
-          notes,
-          new Set(exposures.map((e) => e.noteId)),
-          0,
-        )
+        bounded
+          ? !sourceBudgetFits(session, current.expectedSeconds) ||
+            (current.format === "brief_explanation" &&
+              session.teachbacks >= 1) ||
+            session.interventions?.some((i) => i.activityId === current.id)
+          : !requested &&
+            !eligibleActivity(
+              current,
+              session,
+              notes,
+              new Set(exposures.map((e) => e.noteId)),
+              0,
+            )
       )
         throw new Error(
           "This check no longer fits the session budget or exposure rules.",
@@ -67,7 +76,7 @@ export async function openIntervention(
         activityId: current.id,
         activityVersion: current.version,
         reason,
-        policy: ADAPTIVE_POLICY,
+        policy: bounded ? "source-exercise-1" : ADAPTIVE_POLICY,
         startedAt: now(),
         durationMs: 0,
         expectedMs: current.expectedSeconds * 1000,
@@ -155,7 +164,14 @@ export async function saveAdaptiveAttempt(
 ) {
   return db.transaction(
     "rw",
-    [db.sessions, db.activities, db.attempts, db.outbox],
+    [
+      db.sessions,
+      db.activities,
+      db.attempts,
+      db.outbox,
+      db.notes,
+      db.exposures,
+    ],
     async () => {
       const prior = await db.attempts.get(interventionId);
       if (prior) return prior;
@@ -164,11 +180,13 @@ export async function saveAdaptiveAttempt(
         (i) => i.id === interventionId,
       );
       const activity = entry && (await db.activities.get(entry.activityId));
+      const notes = await db.notes.toArray();
+      const bounded = !!activity && validSourceActivity(activity, notes);
       if (
         !entry ||
         entry.status !== "open" ||
         !activity ||
-        activity.status !== "human_approved" ||
+        (!bounded && activity.status !== "human_approved") ||
         activity.version !== entry.activityVersion
       )
         throw new Error(
@@ -182,8 +200,10 @@ export async function saveAdaptiveAttempt(
         answer: answer.slice(0, 16000),
         at: now(),
         durationMs,
-        assistance: entry.requested,
-        contaminated: entry.requested,
+        assistance:
+          entry.requested ||
+          (bounded && activity.format === "brief_explanation"),
+        contaminated: entry.requested || bounded,
         ...deterministicGrade(activity, answer),
         format: activity.format,
         cognitiveTask: activity.cognitiveTask,
