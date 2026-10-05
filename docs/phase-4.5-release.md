@@ -21,6 +21,8 @@ All exercises show “AI-generated · unverified” and exact source references.
 
 One optional exercise can follow each ten original reviews. Extra practice is limited to 15% of the planned time, 20–30 seconds per exercise, one explanation/comparison per session, and at most three generation requests per session. Learning steps and large overdue queues take priority. Formats rotate across available source formats and previously generated items; a note with one explicit target may support only completion/restatement. The pilot does not force back-to-back questions on every card. Small decks/sessions with fewer than ten completed original reviews may never show an extra exercise.
 
+For troubleshooting, open the browser DevTools Console and filter for `[Sanjeev AI]`. `session_enabled`, `request_started`, `request_accepted`, `question_ready`, and `question_displayed` show the request path. `question_skipped`, `question_abstained`, `request_rejected`, `request_failed`, and `request_timed_out` explain why a question was not shown. Logs include IDs, task/format, status and reason only; they do not print card text, answers, prompts, or source excerpts. AI practice requires a signed-in, online, opted-in timed session, and a supported source note.
+
 Generation runs in the background. Failure, abstention, quotas or lack of a fitting activity leave the original review available. Display, attempt, report and interruption records persist locally and sync. A report quarantines the version for the owner and prevents new generation for that same source version pending review. A source edit invalidates the exercise. Restored backups quarantine generated content rather than treating restored metadata as trusted publication.
 
 ## Operations and compatibility

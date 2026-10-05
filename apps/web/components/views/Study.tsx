@@ -90,6 +90,8 @@ export default function Study() {
   const [aiNotice, setAiNotice] = useState("");
   const aiController = useRef<AbortController | null>(null);
   const requestedSlots = useRef(new Set<number>());
+  const loggedUnsupportedNotes = useRef(new Set<string>());
+  const loggedActivities = useRef(new Set<string>());
   const exposureId = useRef("");
   const eventId = useRef(id());
   const activeMs = useRef(0);
@@ -155,19 +157,63 @@ export default function Study() {
     )
       return;
     const slot = Math.floor(session.reviews / 10);
-    if (
-      slot >= 3 ||
-      requestedSlots.current.has(slot) ||
-      !sourceUnits(item.note).length
-    )
+    if (slot >= 3 || requestedSlots.current.has(slot)) return;
+    if (!sourceUnits(item.note).length) {
+      if (!loggedUnsupportedNotes.current.has(item.note.id)) {
+        loggedUnsupportedNotes.current.add(item.note.id);
+        console.info("[Sanjeev AI]", {
+          event: "question_skipped",
+          sessionId,
+          slot,
+          reason: "note_has_no_supported_source_text",
+        });
+      }
       return;
+    }
     requestedSlots.current.add(slot);
     const signal = aiController.current?.signal;
     if (!signal) return;
     void prepareSourcePractice(db, sessionId, item.note, signal).catch((e) => {
-      if (!signal.aborted) setAiNotice(errorMessage(e));
+      if (!signal.aborted) {
+        console.warn("[Sanjeev AI]", {
+          event: "request_error",
+          sessionId,
+          slot,
+          errorType: e instanceof Error ? e.name : "UnknownError",
+        });
+        setAiNotice(errorMessage(e));
+      }
     });
   }, [db, sessionId, session, item, features.sourcePractice, user]);
+  useEffect(() => {
+    if (!activity?.sourceRecipe || loggedActivities.current.has(activity.id))
+      return;
+    loggedActivities.current.add(activity.id);
+    console.info("[Sanjeev AI]", {
+      event: "question_displayed",
+      activityId: activity.id,
+      format: activity.format,
+      cognitiveTask: activity.cognitiveTask,
+      label: "AI-GENERATED · UNVERIFIED",
+    });
+  }, [activity]);
+  useEffect(() => {
+    if (!session?.aiQuestions || session.completed) return;
+    console.info("[Sanjeev AI]", {
+      event: "session_enabled",
+      sessionId,
+      provider: features.provider,
+      online: navigator.onLine,
+      eligibleAfterReviews: 10,
+      maximumRequests: 3,
+    });
+  }, [
+    session?.id,
+    session?.aiQuestions,
+    session?.completed,
+    sessionId,
+    features.provider,
+  ]);
   useEffect(() => {
     if (!intervention) return;
     const timer = setInterval(() => {
@@ -569,7 +615,10 @@ export default function Study() {
             </div>
           </section>
         ) : activity ? (
-          <section className="study-card">
+          <section
+            className="study-card"
+            data-ai-generated={activity.sourceRecipe ? "true" : "false"}
+          >
             <p className="eyebrow">
               {activity.sourceRecipe
                 ? "AI-GENERATED · UNVERIFIED"
