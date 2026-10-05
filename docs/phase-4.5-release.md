@@ -37,7 +37,13 @@ Recorded 2026-10-04/05. Strict TypeScript, Biome and the tracked-file secret gua
 
 The production build and standalone packaging passed. Eight Chromium journeys passed locally: private sample import/review/native restore, editing/undo/mobile, offline study/reload, approved synthetic practice, the new navigation, source-only self-check/reporting, public modern import/media/restore, and accessibility. Automated WCAG checks cover desktop/mobile core pages and dark-mode Today/Settings/Account/Help. The optional 50,000-card performance journey was not rerun in this iteration; its baseline measurements remain in `verification.md`.
 
-Hosted results are recorded after deploying this release. Synthetic fixtures exercise the cloud; private sample content remains in its isolated guest browser and is excluded from uploads to Git/deployment services.
+All eight browser journeys also passed on the hosted beta. Synthetic live accounts verified guest migration, matching review heads/state/media on a second browser, offline review/reload followed by one acknowledged sync event, and rejection of another account's source/media access. The cloud suite passed again after the navigation sync repair.
+
+The real source-only smoke passed with `openai:gpt-6-luna`: twelve synthetic cards imported, opt-in started off, the Railway job published a bounded exercise, ten original reviews preceded its display, source references and the unverified label appeared, free text remained uncertain, self-check persisted, reporting quarantined the activity, and revoking consent returned 403 for another request. Exactly ten original reviews and one separate activity attempt reached the cloud; all original card states matched their snapshots from before the extra exercise. Tests wait for asynchronous delivery/acknowledgement rather than assuming an accepted job or a button click means sync has finished. Synthetic accounts are removed afterward; no emails are sent.
+
+Private sample content remains in its isolated guest browser and is excluded from uploads to Git/deployment services. The normal browser suite does not invoke a model for the private sample. Real phones, screen readers, SMTP and operator disaster recovery remain independent gates.
+
+Deployment: [Vercel beta](https://recall-sepia-seven.vercel.app), deployment `dpl_CzpN9CL8Nrc2b9666cN3nVMCe6UL`, application commit `77e96c7`, with `ENABLE_SOURCE_PRACTICE=true`; [Railway worker health](https://recall-worker-production-60b6.up.railway.app/healthz), deployment `27e77719-088d-4a97-ac06-da3dc79a5543`. No new migration or account setup is required for this iteration. Existing origin and internal data identifiers are preserved. Source is published on [GitHub](https://github.com/sahil-shah0203/Sanjeev); the subsequent documentation commit records hosted evidence.
 
 ## Friend testing
 

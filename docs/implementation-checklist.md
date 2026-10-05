@@ -8,7 +8,7 @@
 - [x] Source references, report quarantine, conservative self-check, count/time caps and independent FSRS boundary.
 - [x] Unit/integration coverage for source edits/tampering, abstention, budgets, consent, quotas, ownership, idempotency and reports.
 - [x] Final local production browser/accessibility/offline verification, including light and dark themes.
-- [ ] Vercel/Railway deployment, hosted import/study/sync/source exercise smoke, and GitHub push.
+- [x] Vercel/Railway deployment, hosted import/study/sync/source exercise smoke, and GitHub push.
 
 See [Phase 4.5 release details](phase-4.5-release.md). Remaining evaluation and device gates below still apply.
 
