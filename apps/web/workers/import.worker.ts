@@ -1,5 +1,6 @@
 import { parsePackage } from "@recall/importer";
 import { Library } from "../lib/db/local";
+import { importError } from "../../../packages/importer/src/errors";
 self.onmessage = async (
   event: MessageEvent<{ file: File; owner: string; namespace: string }>,
 ) => {
@@ -23,7 +24,7 @@ self.onmessage = async (
     await db.meta.delete(`staging:${namespace}`);
     postMessage({
       kind: "error",
-      message: e instanceof Error ? e.message : "Import failed.",
+      message: importError(e),
     });
   } finally {
     db.close();

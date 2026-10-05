@@ -12,6 +12,12 @@ import {
 } from "@recall/domain";
 import { protobuf, protoText, protoNum } from "./protobuf";
 import { compatibility, renderCard } from "@recall/card-renderer";
+import { createSHA256 } from "hash-wasm";
+import { looksLikeSvg, safeSvg } from "../../card-renderer/src/svg";
+import {
+  enhancedOcclusion,
+  isEnhancedOcclusion,
+} from "../../card-renderer/src/enhanced-occlusion";
 
 export const LIMITS = {
   package: 512 * 1024 ** 2,
@@ -19,7 +25,7 @@ export const LIMITS = {
   member: 64 * 1024 ** 2,
   total: 2 * 1024 ** 3,
   entries: 100000,
-  timeoutMs: 180000,
+  timeoutMs: 600000,
 };
 export interface ImportOptions {
   wasmUrl?: string;
@@ -156,6 +162,7 @@ export function detectMime(b: Uint8Array): string {
   if (s.startsWith("OggS")) return "audio/ogg";
   if (s.startsWith("RIFF") && s.slice(8, 12) === "WAVE") return "audio/wav";
   if (s.slice(4, 8) === "ftyp") return "video/mp4";
+  if (looksLikeSvg(b)) return "image/svg+xml";
   return "application/octet-stream";
 }
 export function rows(db: Database, query: string): Raw[] {
@@ -204,7 +211,7 @@ export async function parsePackage(
     if (options.signal?.aborted) throw new Error("Import cancelled.");
     if (Date.now() - started > LIMITS.timeoutMs)
       throw new Error(
-        "Import exceeded three minutes. Export a smaller selected deck.",
+        "Import exceeded ten minutes. Export a smaller selected deck.",
       );
   };
   if (file.size > LIMITS.package)
@@ -212,7 +219,22 @@ export async function parsePackage(
       "This package exceeds the 512 MiB browser limit. Export a smaller selected deck.",
     );
   options.progress?.("Inspecting archive", 0, 1);
-  const packageHash = await hash(await file.arrayBuffer());
+  // Hash bounded slices: avoid copying an entire large archive into WASM/JS memory.
+  const digest = await createSHA256();
+  for (let offset = 0; offset < file.size; offset += 4 * 1024 ** 2) {
+    check();
+    digest.update(
+      new Uint8Array(
+        await file.slice(offset, offset + 4 * 1024 ** 2).arrayBuffer(),
+      ),
+    );
+    options.progress?.(
+      "Checking package",
+      Math.min(file.size, offset + 4 * 1024 ** 2),
+      file.size,
+    );
+  }
+  const packageHash = digest.digest("hex");
   check();
   const namespace = options.namespace ?? id(),
     importId = id();
@@ -240,20 +262,23 @@ export async function parsePackage(
       check();
       return readEntry(e, limit);
     };
-    let modern = false,
-      dbName = "";
+    let version: number;
     if (entries.has("meta")) {
-      const version = protoNum(protobuf(await read("meta", 1024)), 1);
-      if (version !== 3)
+      version = protoNum(protobuf(await read("meta", 1024)), 1);
+      if (![1, 2, 3].includes(version))
         throw new Error(
-          `Unsupported Anki package version ${version}. Export in a supported format.`,
+          `This file declares unknown Anki package version ${version}. Your library has not changed.`,
         );
-      modern = true;
-      dbName = "collection.anki21b";
-    } else
-      dbName = entries.has("collection.anki21")
-        ? "collection.anki21"
-        : "collection.anki2";
+    } else version = entries.has("collection.anki21") ? 2 : 1;
+    // Metadata is authoritative. Never read the dummy legacy collection when
+    // a newer package's real collection is missing or damaged.
+    const modern = version === 3;
+    const dbName = [
+      "",
+      "collection.anki2",
+      "collection.anki21",
+      "collection.anki21b",
+    ][version];
     options.progress?.("Reading collection", 0, 1);
     const packed = await read(dbName, LIMITS.database);
     const bytes = modern ? zstd(packed, LIMITS.database) : packed;
@@ -438,6 +463,7 @@ export async function parsePackage(
         );
     }
     const missingMedia: string[] = [];
+    const unavailableMedia = new Set<string>();
     for (let i = 0; i < mediaMap.length; i++) {
       check();
       const { name, index } = mediaMap[i];
@@ -459,8 +485,21 @@ export async function parsePackage(
       if (totalDecoded > LIMITS.total)
         throw new Error("Decoded collection exceeds the total limit.");
       const mime = detectMime(data);
-      if (mime === "application/octet-stream")
+      if (mime === "image/svg+xml") {
+        try {
+          if (data.length > 1024 * 1024) throw new Error("SVG size limit.");
+          safeSvg(new TextDecoder().decode(data));
+        } catch {
+          unavailableMedia.add(name);
+          warnings.push(
+            `Unsupported SVG is preserved but not displayed: ${name}`,
+          );
+        }
+      }
+      if (mime === "application/octet-stream") {
+        unavailableMedia.add(name);
         warnings.push(`Media is preserved but not displayed: ${name}`);
+      }
       const asset: MediaAsset = {
         id: id(),
         namespace,
@@ -497,15 +536,33 @@ export async function parsePackage(
       const n = notesById.get(c.noteId)!;
       const t = typesById.get(n.typeId)!;
       if (!c.supported) continue;
+      if (isEnhancedOcclusion(t)) {
+        const sources = Object.values(enhancedOcclusion(t, n));
+        if (
+          sources.some(
+            (name) =>
+              !names.has(name) ||
+              missingMedia.includes(name) ||
+              unavailableMedia.has(name),
+          )
+        ) {
+          c.supported = false;
+          c.reason =
+            "An image-occlusion image or mask is missing or unsupported.";
+        }
+        continue;
+      }
       const questionFields =
         t.kind === "occlusion"
           ? [n.fields[1]]
           : [renderCard(t, n, c.ord, false).html];
       if (
-        questionFields.some((f) => missingMedia.some((m) => f?.includes(m)))
+        questionFields.some((f) =>
+          [...missingMedia, ...unavailableMedia].some((m) => f?.includes(m)),
+        )
       ) {
         c.supported = false;
-        c.reason = "A question image or audio file is missing.";
+        c.reason = "A question image or audio file is missing or unsupported.";
       }
     }
     if (
@@ -514,7 +571,7 @@ export async function parsePackage(
       )
     )
       warnings.push(
-        "Deck scripts are not executed. Supported AnKing cards use a native layout.",
+        "Deck scripts are not executed. Supported AnKing and image-occlusion cards use native layouts.",
       );
     return {
       report: {
@@ -524,7 +581,7 @@ export async function parsePackage(
         filename: file.name ?? "collection.apkg",
         bytes: file.size,
         format: modern ? "Anki v3" : dbName,
-        parserVersion: "recall-import-1",
+        parserVersion: "recall-import-2",
         createdAt: now(),
         status: "staged",
         notes: notes.length,

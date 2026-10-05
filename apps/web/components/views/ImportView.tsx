@@ -4,7 +4,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { mergeImport } from "../../features/merge";
 import Link from "next/link";
 import { Upload, FileArchive, CheckCircle2, ArrowRight, X } from "lucide-react";
-import { id, type ImportBundle, errorMessage } from "@recall/domain";
+import { id, type ImportBundle } from "@recall/domain";
+import { importError } from "../../../../packages/importer/src/errors";
 import { useLibrary } from "../LibraryProvider";
 import { planHistory } from "@recall/scheduler";
 import { commitImport } from "../../lib/db/local";
@@ -72,8 +73,7 @@ export default function ImportView() {
       const estimate = await navigator.storage?.estimate?.();
       if (
         estimate?.quota &&
-        estimate.usage &&
-        file.size * 3 > estimate.quota - estimate.usage
+        file.size * 3 > estimate.quota - (estimate.usage ?? 0)
       )
         throw new Error(
           "There is not enough browser storage. Export a smaller deck or free space before importing.",
@@ -86,10 +86,10 @@ export default function ImportView() {
       timeout.current = setTimeout(() => {
         void cleanup().then(() =>
           setError(
-            "Import exceeded three minutes. Export a smaller selected deck.",
+            "Import exceeded ten minutes. Export a smaller selected deck.",
           ),
         );
-      }, 180000);
+      }, 600000);
       setProgress({ phase: "Inspecting archive", current: 0, total: 1 });
       w.onmessage = (e) => {
         if (e.data.kind === "progress") setProgress(e.data);
@@ -100,7 +100,7 @@ export default function ImportView() {
           w.terminate();
         } else {
           clearTimeout(timeout.current);
-          setError(e.data.message);
+          setError(importError(e.data.message));
           setProgress(null);
           w.terminate();
         }
@@ -115,7 +115,7 @@ export default function ImportView() {
       };
       w.postMessage({ file, owner: db.owner, namespace: staging.current });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(importError(e));
       setProgress(null);
     }
   };
@@ -143,7 +143,7 @@ export default function ImportView() {
       staging.current = "";
       setDone(true);
     } catch (e) {
-      setError(errorMessage(e));
+      setError(importError(e));
     } finally {
       setBusy(false);
     }

@@ -4,6 +4,8 @@ Beta: https://recall-sepia-seven.vercel.app
 
 Start with two or three friends and small exports they are allowed to use. Keep Anki and a backup as the source of recovery during the beta.
 
+All three current `.apkg` container versions are supported, including explicit version-2 exports and the Image Occlusion Enhanced mask layout. For large decks, use a regular browser window with available storage; private browsing can impose a smaller storage budget even when the disk has free space. The current package limit is 512 MiB. See [the compatibility matrix](import-compatibility.md) for remaining template and media limits.
+
 1. Open the app without signing in. Try the six demonstration cards, then import a small `.apkg`. Compare the reported playable, suspended and unsupported counts with Anki. Unsupported content should be explained rather than silently shown as a blank card.
 2. Study a few cards. Space reveals; 1–4 grade; Z undoes. Try **I can’t attempt this yet**, edit a note, flag/suspend/bury a card, and verify the original answer stays hidden until reveal.
 3. Download a native backup. Restore it in an empty browser profile and compare the deck, history and media.

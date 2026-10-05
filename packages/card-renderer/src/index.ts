@@ -1,5 +1,6 @@
 import { type Note, type NoteType } from "@recall/domain";
 import { occlusionShapes } from "./occlusion";
+import { isEnhancedOcclusion, enhancedOcclusion } from "./enhanced-occlusion";
 
 export interface ClozePart {
   kind: "text" | "cloze";
@@ -160,6 +161,10 @@ export function compatibility(
   ord: number,
 ): { supported: boolean; reason?: string } {
   try {
+    if (isEnhancedOcclusion(type)) {
+      enhancedOcclusion(type, note);
+      return { supported: true };
+    }
     if (type.kind === "occlusion") {
       occlusionShapes(note.fields[0], ord + 1);
       if (!/<img\b[^>]*\bsrc=["'][^"']+["']/i.test(note.fields[1] ?? ""))
@@ -216,6 +221,18 @@ export function renderCard(
   answer: boolean,
   count = 0,
 ): { html: string; extras: { name: string; html: string }[] } {
+  if (isEnhancedOcclusion(type)) {
+    const field = (name: string) =>
+      note.fields[type.fields.indexOf(name)] ?? "";
+    return {
+      html: field("Header"),
+      extras: answer
+        ? ["Footer", "Remarks", "Sources", "Extra 1", "Extra 2"]
+            .filter((name) => field(name).trim())
+            .map((name) => ({ name, html: field(name) }))
+        : [],
+    };
+  }
   if (type.kind === "occlusion")
     return {
       html: note.fields[2] ?? "",

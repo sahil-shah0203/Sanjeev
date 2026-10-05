@@ -86,7 +86,7 @@ describe("real packages and recovery", () => {
     await z.add("collection.anki2", new TextReader("not SQLite"));
     await z.add("media", new TextReader("{}"));
     await expect(parsePackage(await z.close(), { wasmUrl })).rejects.toThrow(
-      "Unsupported Anki package version",
+      "unknown Anki package version 9",
     );
     const z2 = new ZipWriter(new BlobWriter());
     await z2.add("collection.anki2", new TextReader("not SQLite"));

@@ -10,7 +10,8 @@ import {
 } from "../apps/web/lib/db/local";
 import { exportLibrary, restoreLibrary } from "../apps/web/features/backup";
 import { demoBundle } from "../apps/web/features/demo";
-import { id } from "@recall/domain";
+import { id, hash } from "@recall/domain";
+import { importError } from "../packages/importer/src/errors";
 let db: Library;
 const storage = new Map<string, string>();
 beforeEach(() => {
@@ -29,6 +30,31 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await db.delete();
+});
+it("rolls back a quota-failed import and keeps the previous library intact for retry", async () => {
+  await commitImport(db, await demoBundle());
+  const before = {
+    cards: await db.cards.toArray(),
+    states: await db.states.toArray(),
+    outbox: await db.outbox.count(),
+  };
+  const bundle = await demoBundle();
+  bundle.report.hash = await hash("second synthetic import");
+  const fail = () => {
+    throw new DOMException("QuotaExceededError", "QuotaExceededError");
+  };
+  db.imports.hook("creating", fail);
+  await expect(commitImport(db, bundle)).rejects.toThrow("QuotaExceededError");
+  expect(await db.cards.toArray()).toEqual(before.cards);
+  expect(await db.states.toArray()).toEqual(before.states);
+  expect(await db.outbox.count()).toBe(before.outbox);
+  expect(await db.imports.count()).toBe(1);
+  expect(importError(new DOMException("", "QuotaExceededError"))).toContain(
+    "non-private",
+  );
+  db.imports.hook("creating").unsubscribe(fail);
+  await commitImport(db, bundle);
+  expect(await db.cards.count()).toBe(12);
 });
 it("commits event, schedule and outbox atomically; rejects stale tabs; survives reopen and undo", async () => {
   const b = await demoBundle();

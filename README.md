@@ -28,8 +28,8 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 
 ## What is implemented
 
-- Browser-worker imports for legacy `collection.anki2`/`collection.anki21` and metadata-directed modern Zstandard/protobuf packages. Real inventory, preview, cancel, resource limits, missing-media diagnostics, and explicit unsupported-card quarantine.
-- Safe basic/reversed/conditional/cloze rendering, the supported AnKing pattern, controlled audio, math, image zoom, and a bounded native image-occlusion subset. Deck scripts are not executed.
+- Browser-worker imports for all three current Anki package versions: `collection.anki2`, `collection.anki21` (with or without version metadata), and modern Zstandard/protobuf `collection.anki21b`. Streaming package checksums, real inventory, preview, cancel, resource limits, missing-media diagnostics, and explicit unsupported-card quarantine.
+- Safe basic/reversed/conditional/cloze rendering, the supported AnKing pattern, controlled audio, math, image zoom, built-in image-occlusion shapes and Image Occlusion Enhanced raster/static-SVG masks. Deck scripts are not executed.
 - Deterministic `ts-fsrs@5.4.2` scheduling, due/new separation, study-day rollover, sibling burying, keyboard review, durable atomic saves, undo, session resume, and no-attempt exposure tracking.
 - Browsing/search in a worker with paged results; note editing with revisions; suspend, bury, flag, and source reports.
 - Explicit fresh import or conservative replay of complete standard personal histories. First due calendar days are preserved in the confirmed export timezone. Incomplete, filtered, or manually rescheduled histories require a supported re-export or an explicit fresh start.
@@ -42,7 +42,7 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 
 ## Limits to understand
 
-Read [import compatibility](docs/import-compatibility.md) before moving a real collection. Arbitrary add-on templates, nested clozes, third-party image occlusion, rotated/custom masks, full Anki scheduling round trips, AnkiWeb sync, and AnkiHub updates are outside this release's supported subset. Larger than 512 MiB packages must be exported as smaller selections; there is no hosted large-import service.
+Read [import compatibility](docs/import-compatibility.md) before moving a real collection. All current container versions are handled; arbitrary add-on scripts, nested clozes, unsupported built-in occlusion shapes, active or unsupported SVG graphics, full Anki scheduling round trips, AnkiWeb sync, and AnkiHub updates remain outside the supported subset. Larger than 512 MiB packages must be exported as smaller selections; there is no hosted large-import service. The 414 MiB local version-2 regression sample imports all 1,437 cards and 3,738 media entries.
 
 History replay uses Sanjeev's pinned defaults, not a claim to reproduce every Anki scheduler configuration. Untested histories are preserved rather than guessed. The replay fixture corpus is synthetic; representative authorized personal histories still need validation.
 
@@ -65,6 +65,8 @@ npm audit
 ```
 
 Browser tests use an already-running server at `http://localhost:3000`. To exercise the production/offline path, build/start first and set `TEST_PRODUCTION=1`; `TEST_BASE_URL` can point to a different port. CI starts the production server automatically. Private-sample tests skip when that file is absent. Synthetic tests do not require it.
+
+`tests/e2e/import-compatibility.spec.ts` verifies exact masked pixels, reveal/zoom, offline reload and a saved review using authored synthetic media. Set `PRIVATE_APKG` to the local BlueLink sample's path to additionally run its 414 MiB import/inventory/study check in an isolated guest browser. That optional test expects this specific sample's counts. It never signs in, syncs the deck or sends its contents to an AI provider. Keep private packages and browser artifacts out of commits and deployment uploads.
 
 See [verification](docs/verification.md) for actual results and limits. The suite covers PostgreSQL RLS, the real reconciliation handlers, hostile archives, scheduler transitions, source updates, restore, and browser journeys. Automated tests do not establish educational benefit or qualified medical correctness.
 

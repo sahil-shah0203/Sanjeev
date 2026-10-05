@@ -11,6 +11,9 @@ import {
 } from "@recall/domain";
 import { useLibrary } from "./LibraryProvider";
 import OcclusionImage from "./OcclusionImage";
+import EnhancedOcclusionImage from "./EnhancedOcclusionImage";
+import { isEnhancedOcclusion } from "../../../packages/card-renderer/src/enhanced-occlusion";
+import { looksLikeSvg, safeSvg } from "../../../packages/card-renderer/src/svg";
 export default function CardContent({
   card,
   note,
@@ -57,20 +60,51 @@ export default function CardContent({
         : Promise.resolve([]),
     [db, note.namespace, names],
   );
-  const [urls, setUrls] = useState(new Map<string, string>());
+  const [prepared, setPrepared] = useState<{
+    assets: MediaAsset[];
+    urls: Map<string, string>;
+  }>();
+  const urls = useMemo(
+    () =>
+      prepared && prepared.assets === assets
+        ? prepared.urls
+        : new Map<string, string>(),
+    [prepared, assets],
+  );
   const [zoom, setZoom] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
+    let cancelled = false;
     const map = new Map<string, string>();
-    for (const asset of assets ?? [])
-      if (
-        asset.mime.startsWith("image/") ||
-        asset.mime.startsWith("audio/") ||
-        asset.mime.startsWith("video/")
-      )
-        map.set(asset.name, URL.createObjectURL(asset.blob));
-    setUrls(map);
+    const run = async () => {
+      if (!assets) return;
+      for (const asset of assets) {
+        if (!/^(?:image|audio|video)\//.test(asset.mime)) continue;
+        let blob = asset.blob;
+        // Validate again at display time, including media restored or synced
+        // from another client. Only a rebuilt, resource-free SVG becomes a URL.
+        if (
+          asset.mime === "image/svg+xml" ||
+          /\.svg$/i.test(asset.name) ||
+          looksLikeSvg(new Uint8Array(await blob.slice(0, 4096).arrayBuffer()))
+        ) {
+          try {
+            if (blob.size > 1024 * 1024) continue;
+            blob = new Blob([safeSvg(await blob.text())], {
+              type: "image/svg+xml",
+            });
+          } catch {
+            continue;
+          }
+        }
+        if (cancelled) return;
+        map.set(asset.name, URL.createObjectURL(blob));
+      }
+      if (!cancelled) setPrepared({ assets, urls: map });
+    };
+    void run();
     return () => {
+      cancelled = true;
       for (const url of map.values()) URL.revokeObjectURL(url);
     };
   }, [assets]);
@@ -129,12 +163,23 @@ export default function CardContent({
         />
         {type.kind === "occlusion" && (
           <OcclusionImage
+            key={`${card.id}:${note.version}:${revealed}`}
             card={card}
             note={note}
             revealed={revealed}
             urls={urls}
           />
         )}{" "}
+        {isEnhancedOcclusion(type) && (
+          <EnhancedOcclusionImage
+            key={`${card.id}:${note.version}:${revealed}`}
+            note={note}
+            type={type}
+            revealed={revealed}
+            urls={urls}
+            loading={!assets || prepared?.assets !== assets}
+          />
+        )}
         {revealed && showExtras && output.extras.length > 0 && (
           <div className="extras">
             {output.extras.map((e) => (

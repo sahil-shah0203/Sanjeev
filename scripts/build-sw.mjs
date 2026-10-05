@@ -44,7 +44,7 @@ export async function buildOfflineShell(
   const worker = `const CACHE=${JSON.stringify(`recall-shell-${build}`)};
 const ASSETS=${JSON.stringify(assets)};
 const SHELL=${JSON.stringify(shell)};
-async function cacheShell(){const cache=await caches.open(CACHE);await cache.addAll([...ASSETS,...SHELL]);}
+async function cacheShell(){const cache=await caches.open(CACHE);const urls=[...new Set([...ASSETS,...SHELL])];for(let i=0;i<urls.length;i+=8)await Promise.all(urls.slice(i,i+8).map(async url=>{const response=await fetch(new Request(url,{cache:'reload'}));if(!response.ok)throw new Error('Offline asset unavailable: '+url);await cache.put(url,response);}));}
 self.addEventListener('install',event=>event.waitUntil(cacheShell()));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 self.addEventListener('message',event=>{if(event.data?.type==='CACHE_SHELL')event.waitUntil(cacheShell().then(()=>event.ports[0]?.postMessage({ok:true})).catch(()=>event.ports[0]?.postMessage({ok:false})));if(event.data?.type==='ACTIVATE_AFTER_SESSION')self.skipWaiting();});

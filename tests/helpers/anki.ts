@@ -11,6 +11,7 @@ import { ankiContent } from "@recall/exporter";
 import { readEntry } from "@recall/importer";
 import { demoBundle } from "../../apps/web/features/demo";
 import { id, hash, type ImportBundle } from "@recall/domain";
+import { deflateSync } from "node:zlib";
 export const wasmUrl = createRequire(import.meta.url).resolve(
   "sql.js/dist/sql-wasm.wasm",
 );
@@ -165,4 +166,135 @@ export async function syntheticPackage(
     [await writer.close()],
     modern ? "synthetic-modern.apkg" : "synthetic-legacy.apkg",
   );
+}
+
+/** Change only the container, so the same authored collection exercises all
+ * legacy encodings without depending on any private deck. */
+export async function legacyContainer(
+  file: Blob,
+  version: number,
+  meta = true,
+  omitCollection = false,
+) {
+  const reader = new ZipReader(new BlobReader(file));
+  const writer = new ZipWriter(new BlobWriter());
+  try {
+    if (meta)
+      await writer.add("meta", new Uint8ArrayReader(proto([1, version])));
+    for (const e of await reader.getEntries()) {
+      if (e.filename === "collection.anki2" && omitCollection) continue;
+      const name =
+        e.filename === "collection.anki2" && version === 2
+          ? "collection.anki21"
+          : e.filename;
+      await writer.add(
+        name,
+        new Uint8ArrayReader(await readEntry(e, 128 * 1024 ** 2)),
+      );
+    }
+    if (version === 2)
+      await writer.add(
+        "collection.anki2",
+        new Uint8ArrayReader(
+          new TextEncoder().encode("dummy compatibility collection"),
+        ),
+      );
+    return new File([await writer.close()], `synthetic-v${version}.apkg`);
+  } finally {
+    await reader.close();
+  }
+}
+
+export const questionMask =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><g><rect x="20" y="20" width="60" height="60" fill="#ff0000"/></g></svg>';
+export const answerMask =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect x="0" y="0" width="10" height="10" fill="#0000ff"/></svg>';
+
+// A white 100px PNG authored from raw pixels, with real CRCs and no copied media.
+function whitePng() {
+  const chunk = (type: string, data: Buffer) => {
+    const input = Buffer.concat([Buffer.from(type), data]);
+    let crc = 0xffffffff;
+    for (const byte of input) {
+      crc ^= byte;
+      for (let b = 0; b < 8; b++)
+        crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+    const header = Buffer.alloc(4),
+      checksum = Buffer.alloc(4);
+    header.writeUInt32BE(data.length);
+    checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+    return Buffer.concat([header, input, checksum]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(100);
+  header.writeUInt32BE(100, 4);
+  header[8] = 8;
+  header[9] = 2;
+  const pixels = Buffer.alloc(301 * 100, 255);
+  for (let y = 0; y < 100; y++) pixels[y * 301] = 0;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(pixels)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+export async function enhancedPackage(
+  mask = questionMask,
+  missingAnswer = false,
+) {
+  const b = await demoBundle();
+  b.notes = b.notes.slice(0, 1);
+  b.cards = b.cards.slice(0, 1);
+  b.types[0].kind = "basic";
+  b.types[0].name = "Image Occlusion Enhanced (synthetic)";
+  b.types[0].fields = [
+    "Header",
+    "Image",
+    "Question Mask",
+    "Answer Mask",
+    "Remarks",
+  ];
+  b.types[0].templates = [
+    {
+      ord: 0,
+      name: "Mask",
+      front:
+        '{{Image}}{{Question Mask}}<script>throw new Error("Deck scripts must never execute")</script>',
+      back: "{{Image}}{{Answer Mask}}",
+    },
+  ];
+  b.notes[0].fields = [
+    "Recall the covered shape",
+    '<img src="base.png">',
+    '<img src="question.svg">',
+    '<img src="answer.svg">',
+    "Synthetic explanation.",
+  ];
+  b.notes[0].version = await hash(JSON.stringify(b.notes[0].fields));
+  const assets: [string, Uint8Array, string][] = [
+    ["base.png", whitePng(), "image/png"],
+    ["question.svg", new TextEncoder().encode(mask), "image/svg+xml"],
+  ];
+  if (!missingAnswer)
+    assets.push([
+      "answer.svg",
+      new TextEncoder().encode(answerMask),
+      "image/svg+xml",
+    ]);
+  b.media = await Promise.all(
+    assets.map(async ([name, bytes, mime]) => ({
+      id: id(),
+      namespace: b.report.namespace,
+      name,
+      hash: await hash(bytes),
+      mime,
+      size: bytes.length,
+      blob: new Blob([bytes as BlobPart], { type: mime }),
+    })),
+  );
+  const exported = await ankiContent(b, wasmUrl);
+  return legacyContainer(exported.blob, 2);
 }
