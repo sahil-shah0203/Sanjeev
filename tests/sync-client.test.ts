@@ -63,3 +63,51 @@ it("retries an in-flight pull when guest copying adds local work, preserving and
     vi.unstubAllGlobals();
   }
 });
+
+it("finishes sync on a new connection after navigation closes an in-flight connection", async () => {
+  const owner = id();
+  const previous = new Library(owner);
+  const current = new Library(owner);
+  let release!: () => void;
+  let started!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requested = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let pulls = 0;
+  vi.stubGlobal("navigator", { onLine: true });
+  vi.stubGlobal("fetch", async (url: string) => {
+    if (url.startsWith("/api/sync/pull")) {
+      if (++pulls === 1) {
+        started();
+        await blocked;
+      }
+      return Response.json({ changes: [], nextCursor: pulls, hasMore: false });
+    }
+    if (url.startsWith("/api/media/list"))
+      return Response.json({ assets: [], nextCursor: "" });
+    throw new Error("Unexpected request");
+  });
+  try {
+    await previous.open();
+    const oldRun = syncLibrary(previous, () => {}).catch((error) => error);
+    await requested;
+    previous.close();
+    await current.open();
+    const status: string[] = [];
+    const resumed = syncLibrary(current, (s) => status.push(s));
+    release();
+    expect((await oldRun).name).toBe("DatabaseClosedError");
+    await resumed;
+    expect(pulls).toBe(2);
+    expect((await current.meta.get("cursor"))?.value).toBe(2);
+    expect(status.at(-1)).toBe("Synced across your devices");
+  } finally {
+    release();
+    previous.close();
+    await current.delete();
+    vi.unstubAllGlobals();
+  }
+});

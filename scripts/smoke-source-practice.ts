@@ -1,5 +1,5 @@
 // Explicit hosted smoke using a temporary synthetic account. Never uploads private decks.
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { Pool } from "pg";
@@ -27,6 +27,7 @@ const pool = new Pool({
 });
 const browser = await chromium.launch();
 let owner: string | undefined;
+let smokePage: Page | undefined;
 try {
   const email = `sanjeev-smoke-${randomUUID()}@example.com`,
     password = randomUUID() + randomUUID();
@@ -64,6 +65,11 @@ try {
     })),
   );
   const page = await context.newPage();
+  smokePage = page;
+  page.on("response", (response) => {
+    if (response.url().endsWith("/api/source-practice"))
+      console.log("Source-practice API status:", response.status());
+  });
   const bundle = await demoBundle();
   const template = bundle.notes[0],
     card = bundle.cards[0];
@@ -227,6 +233,29 @@ try {
     JSON.stringify(result, null, 2),
   );
   console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  if (owner) {
+    console.error(
+      "Synthetic worker diagnostics:",
+      (
+        await pool.query(
+          "SELECT status,error_code,output FROM public.jobs WHERE owner_id=$1 ORDER BY created_at",
+          [owner],
+        )
+      ).rows,
+    );
+  }
+  if (smokePage) {
+    console.error(
+      "Study notices:",
+      await smokePage.locator(".notice").allTextContents(),
+    );
+    await smokePage.screenshot({
+      path: "test-results/source-smoke-failure.png",
+      fullPage: true,
+    });
+  }
+  throw error;
 } finally {
   await browser.close();
   if (owner) {

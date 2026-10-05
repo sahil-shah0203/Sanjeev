@@ -200,7 +200,7 @@ export default function LibraryProvider({ children }: { children: ReactNode }) {
   if (!db)
     return (
       <div className="center" role="status">
-        <span className="brand-mark">R</span>
+        <span className="brand-mark">S</span>
         <p>Opening your study space…</p>
       </div>
     );

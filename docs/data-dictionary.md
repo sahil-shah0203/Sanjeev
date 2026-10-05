@@ -24,6 +24,10 @@ Cloud source/study documents use a typed JSONB envelope keyed by `(owner_id, ent
 
 Jobs, reviewer assignments, content audits and spend reservations are server-only operational tables. A collection owner ID entered in the reviewer UI grants no access by itself; authorization requires an administrator-assigned scope.
 
+Phase 4.5 adds optional `sessions.aiQuestions` (per-session consent, default off) and `aiRequests` (bounded request count). The local `source-request:<session>:<slot>` metadata reserves generation slots across reloads. Legacy adaptive/AI/evaluation preference fields remain readable for compatibility, but Settings no longer exposes those checkboxes or uses them to opt students into source-only practice.
+
+An activity with `sourceRecipe` records a source-unit index and transformation variant. `source_bounded` means its displayed content must exactly match the deterministic compiler for the current source version; it is distinct from medical/human approval. Server publication is protected from client sync writes. Reports and source changes invalidate delivery, and native restore quarantines the publication state. All source-only practice is contaminated exposure; free text remains uncertain with an optional self-check annotation. It never writes FSRS state.
+
 Source, review, and adaptive records have separate responsibilities. The original review adapter rejects generated, assisted, unattempted, and contaminated successes. New medical generation cannot write original schedules. An uncertain or disputed alternate answer is not counted as a confident evidence observation.
 
 The current schema has no separate universal mastery model, embedding service, social data, or automatic parameter-training job. Objective descriptions and references are embedded in versioned activities; observed evidence is derived from attempts. Evaluation consent is a preference only: no experiment assignment or background analytics upload is silently performed.

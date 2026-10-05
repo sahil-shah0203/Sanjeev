@@ -171,10 +171,19 @@ async function runSync(db: Library, status: (s: string) => void) {
         : "Synced across your devices",
   );
 }
-const active = new Map<string, Promise<void>>();
-export function syncLibrary(db: Library, status: (s: string) => void) {
+const active = new Map<string, { db: Library; promise: Promise<void> }>();
+export function syncLibrary(
+  db: Library,
+  status: (s: string) => void,
+): Promise<void> {
   const pending = active.get(db.name);
-  if (pending) return pending;
+  if (pending) {
+    if (pending.db === db) return pending.promise;
+    // A route/account remount can close the previous Library while its HTTP
+    // request is still running. Wait for it, then sync this live connection;
+    // never hand a new caller the old connection's DatabaseClosedError.
+    return pending.promise.catch(() => {}).then(() => syncLibrary(db, status));
+  }
   const run = async () => {
     // Guest claim or a review can add an outbox entry while a pull is in
     // flight. Push that work before trying the pull again, without an error UI.
@@ -193,7 +202,7 @@ export function syncLibrary(db: Library, status: (s: string) => void) {
       ? navigator.locks.request(`recall-sync-${db.owner}`, run)
       : run()
   ).finally(() => active.delete(db.name));
-  active.set(db.name, promise);
+  active.set(db.name, { db, promise });
   return promise;
 }
 export async function claimGuest(target: Library) {

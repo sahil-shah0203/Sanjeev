@@ -9,7 +9,7 @@ Use [manual setup](manual-setup.md) for credentials and the first deployment. We
 3. Confirm `/api/health` returns 200. This is a process health check, not proof of database/email/model availability.
 4. Verify real authentication, a sync push/pull, one media upload/download, and guest claim with your project.
 5. Supervise the persistent Node worker when generation/grading is enabled. It logs job identifiers and redacted errors, backs off and retries database outages, and returns 503 from `/healthz` when database contact is stale. Railway restarts failed processes.
-6. Generation produces drafts only; delivery requires assigned review and learner opt-in. Run a synthetic fixture job before a paid call. Paid jobs have no automatic retries.
+6. Broader generation produces drafts requiring assigned review. Phase 4.5 source-only generation may publish `source_bounded` exercises without clinical approval, under the [documented compiler boundary](phase-4.5-release.md); learner session opt-in is required. Run a synthetic fixture job before a paid call. Paid jobs have no automatic retries. Set `ENABLE_SOURCE_PRACTICE=false` on web and worker to disable the source-only pilot.
 
 The Docker web target runs as the unprivileged `node` user. Railway's dedicated worker image is runtime verified; the optional local Compose web stack is not. Use HTTPS and current platform security updates. Account limits, SMTP restrictions, pricing and retention depend on the plan.
 
@@ -49,7 +49,7 @@ Worker leases last 60 seconds and heartbeat every 15 seconds. Model requests tim
 ## Recovery drill
 
 1. Download a native backup from the importing device. Retain that file independently of sync and browser storage.
-2. In an empty browser profile, restore it through Settings. Confirm notes/cards/media counts, an existing review head and due date, an original archive, and one note revision.
+2. In an empty browser profile, restore it through Account & data. Confirm notes/cards/media counts, an existing review head and due date, an original archive, and one note revision. Generated activities restore quarantined, including source-only exercises.
 3. Review one card, close the tab immediately after the next prompt appears, and reopen. Verify one event, one schedule transition, and a recoverable undo.
 4. For a cloud account, sign in on another device and complete the same check after sync. Review separate offline branches and verify one canonical branch plus retained conflict events after reconnection.
 5. Test database and private-storage recovery using the selected hosting plan's documented backup facilities. Restore into a staging environment first. Supabase storage object backups and database backups must both be considered; do not assume one includes the other.
@@ -60,7 +60,7 @@ A proposed pilot target is **daily independent backups (RPO ≤24 hours)** and a
 
 An event advances the schedule only when its parent/head, state version, source version, and recomputed result match the canonical state. Stale branches and future-clock events remain audit records without an extra interval extension. New local writes stop a pending pull so a server snapshot cannot overwrite unsent reviews. A later pass retries automatically.
 
-Use Settings to export unresolved conflict proposals. Existing schedules cannot be replaced by ordinary state `put` requests. Restored history uses an archival mutation that retains events without replaying them. Extended divergent chains require human inspection; there is no automatic “credit all reviews” override.
+Use Account & data to export unresolved conflict proposals. Existing schedules cannot be replaced by ordinary state `put` requests. Restored history uses an archival mutation that retains events without replaying them. Extended divergent chains require human inspection; there is no automatic “credit all reviews” override.
 
 Guest copying snapshots the guest data and outbox consistently, writes the account copy atomically, preserves stable mutation IDs, and retains the guest database after acknowledgement. The copy is a one-time snapshot: subsequent study in the old guest workspace is not automatically merged. Download another native backup before making a separate recovery decision.
 
