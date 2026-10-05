@@ -270,7 +270,8 @@ export default function ContentReview() {
             </div>
             {!prefs.aiConsent && (
               <p className="muted">
-                Selected-source AI processing must first be enabled in Settings.
+                Enable selected-source AI processing above before requesting a
+                draft.
               </p>
             )}
             {job && (

@@ -64,7 +64,7 @@ export default function ImportView() {
     setResumeSuspended(false);
     if (!/\.apkg$/i.test(file.name)) {
       setError(
-        "Choose an Anki package with the .apkg extension. Native backups can be restored in Settings.",
+        "Choose an Anki package with the .apkg extension. Native backups can be restored in Account & data.",
       );
       return;
     }
@@ -126,7 +126,7 @@ export default function ImportView() {
       if (target) {
         const result = await mergeImport(db, bundle, target);
         setMergeMessage(
-          `${result.added} new cards; ${result.updated} source notes updated; ${result.conflicts} conflicts preserved in Settings. Existing schedules are unchanged.`,
+          `${result.added} new cards; ${result.updated} source notes updated; ${result.conflicts} conflicts preserved in Account & data. Existing schedules are unchanged.`,
         );
       } else
         await commitImport(

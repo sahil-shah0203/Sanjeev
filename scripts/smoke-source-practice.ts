@@ -135,6 +135,30 @@ try {
       { timeout: 120000, intervals: [1000, 2000, 5000] },
     )
     .toBeGreaterThan(0);
+  // The worker publishes before the browser's next job poll and sync pull.
+  // Wait for delivery so this deliberately fast review loop tests selection,
+  // rather than racing the background network transfer.
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async (owner) => {
+          const request = indexedDB.open(`recall-v1-${owner}`);
+          const db = await new Promise<IDBDatabase>((resolve) => {
+            request.onsuccess = () => resolve(request.result);
+          });
+          const activities = await new Promise<any[]>((resolve) => {
+            const q = db
+              .transaction("activities")
+              .objectStore("activities")
+              .getAll();
+            q.onsuccess = () => resolve(q.result);
+          });
+          db.close();
+          return activities.filter((a) => a.status === "source_bounded").length;
+        }, owner),
+      { timeout: 60000 },
+    )
+    .toBeGreaterThan(0);
   for (let i = 0; i < 10; i++) {
     await page.getByRole("button", { name: /Show answer/ }).click();
     await page.getByRole("button", { name: /^Easy/ }).click();
@@ -166,6 +190,9 @@ try {
     page.getByRole("button", { name: "Request rubric feedback" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "I need more practice" }).click();
+  await expect(
+    page.getByText(/Self-check recorded: needs more practice/),
+  ).toBeVisible();
   await page.getByText("Source support", { exact: true }).click();
   await expect(page.locator(".source-excerpt")).toBeVisible();
   await page.screenshot({
@@ -175,27 +202,45 @@ try {
   await page
     .getByRole("button", { name: "Report question", exact: true })
     .click();
+  await expect(page.getByTestId("card-face")).toBeVisible();
   await page.getByRole("button", { name: "Turn off", exact: true }).click();
+  await expect(
+    page.getByText("AI questions off for this session."),
+  ).toBeVisible();
   await page.goto(`${origin}/account`);
   await page.getByRole("button", { name: "Sync now" }).click();
   await expect
-    .poll(async () => (await rows("attempts")).length, { timeout: 60000 })
-    .toBe(1);
-  expect((await rows("reviews")).length).toBe(10);
+    .poll(
+      async () => {
+        const attempts = await rows("attempts");
+        return {
+          attempts: attempts.length,
+          reviews: (await rows("reviews")).length,
+          grade: attempts[0]?.grade,
+          contaminated: attempts[0]?.contaminated,
+          adjudication: attempts[0]?.adjudication,
+          activityStatus: (await rows("activities")).find(
+            (a) => a.id === attempts[0]?.activityId,
+          )?.status,
+          aiQuestions: (await rows("sessions")).find((s) => s.id === sessionId)
+            ?.aiQuestions,
+        };
+      },
+      { timeout: 60000 },
+    )
+    .toEqual({
+      attempts: 1,
+      reviews: 10,
+      grade: "uncertain",
+      contaminated: true,
+      adjudication: "needs more practice",
+      activityStatus: "quarantined",
+      aiQuestions: false,
+    });
   const states = await rows("states");
   expect(states.sort((a, b) => a.id.localeCompare(b.id))).toEqual(
     before.sort((a, b) => a.id.localeCompare(b.id)),
   );
-  const attempts = await rows("attempts");
-  expect(attempts[0]).toMatchObject({
-    contaminated: true,
-    grade: "uncertain",
-    adjudication: "needs more practice",
-  });
-  expect(
-    (await rows("activities")).find((a) => a.id === attempts[0].activityId)
-      ?.status,
-  ).toBe("quarantined");
   const jobs = (
     await pool.query(
       "SELECT id,status,input FROM public.jobs WHERE owner_id=$1 ORDER BY created_at",

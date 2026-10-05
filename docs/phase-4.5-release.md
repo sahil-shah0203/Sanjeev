@@ -7,7 +7,7 @@ This iteration implements the [Phase 4.5 brief](phase-4.5-ui-and-study-mode.md).
 - Sanjeev identity, book icon, warm beige surfaces with green accents, and a warm dark theme.
 - Today holds deck/duration setup and the single optional AI switch. Starting from a deck retains that deck in Today’s setup. Import lives in Decks, with a prominent first-import action on an empty Today page.
 - `/settings` contains study preferences and collapsed advanced scheduling. `/account` contains optional sign-in, automatic sync, guest migration, backup/restore, conflict export and collapsed destructive actions. Old `/settings#account` and auth-return links still redirect appropriately.
-- `/help` explains importing, first review, FSRS ratings, shortcuts, optional AI, offline readiness and backups. It never blocks study.
+- `/help` explains importing, first review, FSRS ratings, shortcuts, optional AI, offline readiness and backups. It never blocks study. The generic “A few things to know” import panel was removed; the actual import preview still reports compatibility issues.
 
 ## Exact AI scope
 
@@ -33,7 +33,7 @@ Generation runs in the background. Failure, abstention, quotas or lack of a fitt
 
 ## Verification
 
-Recorded 2026-10-04. Strict TypeScript, Biome and the tracked-file secret guard passed. All 52 unit/integration tests across 12 files passed, including source compilation/tampering/stale versions, abstention, consent, quotas, owner isolation, idempotency, backup quarantine and the FSRS boundary. PostgreSQL tests use PGlite; browser persistence tests use fake-indexeddb.
+Recorded 2026-10-04/05. Strict TypeScript, Biome and the tracked-file secret guard passed. All 53 unit/integration tests across 12 files passed, including source compilation/tampering/stale versions, abstention, consent, quotas, owner isolation, idempotency, backup quarantine and the FSRS boundary. PostgreSQL tests use PGlite; browser persistence tests use fake-indexeddb. A hosted test exposed a route-navigation race: a new study page could inherit a pending sync from the previous closed database connection. Sync now waits for that run and continues on the current connection; a regression test reproduces the closed-connection handoff.
 
 The production build and standalone packaging passed. Eight Chromium journeys passed locally: private sample import/review/native restore, editing/undo/mobile, offline study/reload, approved synthetic practice, the new navigation, source-only self-check/reporting, public modern import/media/restore, and accessibility. Automated WCAG checks cover desktop/mobile core pages and dark-mode Today/Settings/Account/Help. The optional 50,000-card performance journey was not rerun in this iteration; its baseline measurements remain in `verification.md`.
 

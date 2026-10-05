@@ -35,7 +35,7 @@ export async function restoreLibrary(db: Library, file: Blob) {
   const data = await readBackup(file);
   if ((await db.cards.count()) || (await db.imports.count()))
     throw new Error(
-      "Restore requires an empty library so existing progress cannot be overwritten. Export your current library first, then clear it in Settings.",
+      "Restore requires an empty library so existing progress cannot be overwritten. Export your current library first, then clear it in Account & data.",
     );
   const restoreAt = now();
   await db.transaction(
