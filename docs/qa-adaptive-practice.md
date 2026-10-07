@@ -28,7 +28,7 @@ Multiple-choice grading uses the canonical source answer. Written responses can 
 
 ## Media transitions
 
-Study prepares and decodes local media before changing the displayed original card, keeps the previous question visible during preparation, and preloads the next card. A bounded cache reuses prepared URLs. Genuinely missing, unsafe, or undecodable assets still show a media-unavailable state.
+The speculative media preload/cache introduced with this QA release has been reverted after an LSOM masked-image regression. Card media now uses the previous component-owned URL lifecycle, asset loading, SVG safety checks, and mask rendering. A temporary loading transition can still appear while assets prepare; smoother transitions will be revisited separately. Imported media and study progress are preserved.
 
 AI questions, rationales, and written feedback use a brief letter-by-letter visual reveal, capped at 1.6 seconds. The full text reserves its layout space to avoid shifting answer controls. Reduced-motion preferences show it instantly, screen readers receive the complete text, and inputs remain usable throughout. This is a presentation effect after validation, not streamed unverified model output. The study form has a concise explanation prompt and a single skip control.
 

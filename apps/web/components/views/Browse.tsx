@@ -326,7 +326,6 @@ export default function Browse() {
                 {card.supported ? (
                   <>
                     <CardContent
-                      key={`${card.id}:${note.version}`}
                       card={card}
                       note={note}
                       type={type}

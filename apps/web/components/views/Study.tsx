@@ -58,7 +58,6 @@ import { Notice, Busy } from "../ui";
 import CardContent from "../CardContent";
 import AttemptFeedback from "../AttemptFeedback";
 import AiTypedText from "../AiTypedText";
-import { prepareCardMedia } from "../../features/card-media";
 type Item = { card: SourceCard; state: CardState; note: Note; type: NoteType };
 const ratings: RecallRating[] = ["again", "hard", "good", "easy"];
 export default function Study() {
@@ -128,20 +127,7 @@ export default function Study() {
           throw new Error(
             "This card is missing source data. Restore a backup.",
           );
-        await prepareCardMedia(db, note, type);
         setItem({ ...selected, note, type });
-        const upcoming = queue.find(
-          (candidate) => candidate.card.id !== selected.card.id,
-        );
-        if (upcoming)
-          void db.notes
-            .get(upcoming.card.noteId)
-            .then(async (nextNote) => {
-              if (!nextNote) return;
-              const nextType = await db.types.get(nextNote.typeId);
-              if (nextType) await prepareCardMedia(db, nextNote, nextType);
-            })
-            .catch(() => {});
       } else setItem(null);
       setRevealed(false);
       setCount(0);
@@ -938,7 +924,6 @@ export default function Study() {
                   </button>
                 </div>
                 <CardContent
-                  key={`${item.card.id}:${item.note.version}`}
                   card={item.card}
                   note={item.note}
                   type={item.type}
