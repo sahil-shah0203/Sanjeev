@@ -125,6 +125,14 @@ export function failure(error: unknown) {
     JSON.stringify({
       event: "server_error",
       name: error instanceof Error ? error.name : "UnknownError",
+      code:
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        typeof error.code === "string" &&
+        /^[A-Z0-9_]{1,40}$/.test(error.code)
+          ? error.code
+          : undefined,
     }),
   );
   return NextResponse.json(

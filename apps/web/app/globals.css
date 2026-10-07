@@ -202,16 +202,18 @@ kbd {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 31px;
+  font-size: 22px;
   font-weight: 620;
   letter-spacing: -1.4px;
   margin: 0 10px 53px;
+  white-space: nowrap;
 }
 .brand-dot {
   color: var(--accent);
   margin-left: -10px;
 }
 .brand-mark {
+  flex-shrink: 0;
   width: 37px;
   height: 39px;
   background: var(--accent);
@@ -1338,7 +1340,8 @@ dialog::backdrop {
   display: flex;
   gap: 9px;
   align-items: center;
-  font-size: 22px;
+  font-size: 20px;
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: -1px;
   color: var(--accent);
@@ -1857,7 +1860,7 @@ dialog::backdrop {
     padding: 24px 12px;
   }
   .brand {
-    font-size: 27px;
+    font-size: 19px;
     margin-bottom: 40px;
   }
   .brand-mark {
@@ -2436,7 +2439,8 @@ dialog::backdrop {
     display: inline-flex;
   }
   .mobile-brand {
-    font-size: 23px;
+    font-size: 20px;
+    white-space: nowrap;
     font-weight: 650;
     letter-spacing: -1px;
   }

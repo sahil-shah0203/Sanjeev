@@ -28,6 +28,8 @@ Generation runs in the background. Failure, abstention, quotas or lack of a fitt
 
 ## Operations and compatibility
 
+QA deploys from the `QA` branch to `https://sanjeev-qa.vercel.app`; production deploys from `main` to `https://sanjeevstudy.com`. QA needs branch-specific Preview variables: all three AI feature flags set to the exact value `true`, `LLM_PROVIDER=openai`, valid server credentials, and `APP_ORIGIN=https://sanjeev-qa.vercel.app`. Production variables do not configure Preview. Values must not contain literal `\\r`/`\\n` suffixes. The QA environment currently uses the existing Supabase backend; account data is shared with production, while browser-local guest libraries remain specific to their origin.
+
 - New flag: `ENABLE_SOURCE_PRACTICE=true` on Vercel and Railway. Web also requires the existing adaptive/generation flags. Set the new flag to false to stop this pilot while keeping ordinary study available.
 - Existing provider/model configuration, daily reservation ceiling, durable jobs, leases, RLS, origin checks and owner isolation are retained. No new database migration is required: the additive session and activity fields live in the existing versioned documents.
 - `source_bounded` is separate from `human_approved`. Clients cannot mint either publication state through sync. The protected reviewer workflow remains at `/review-content`; it is removed from everyday navigation.
