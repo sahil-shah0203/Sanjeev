@@ -11,68 +11,96 @@ export const SOURCE_PRACTICE_VERSION = "source-exercise-1";
 export type SourceVariant = "recall" | "recognition" | "compare" | "restate";
 export interface SourceUnit {
   field: number;
+  answerField?: number;
   quote: string;
   prompt: string;
   answer: string;
   alternatives: string[];
 }
-/** Only primary text (and the answer field on a basic note). No extras, tags or media. */
+/** Uses explicit clozes wherever they occur, or the first usable front/back text pair. */
 export function sourceUnits(note: Note): SourceUnit[] {
-  const text = stripHtml(note.fields[0] ?? "").trim();
-  if (!text || text.length > 1200 || /\[sound:|\{\{(?!c\d+::)/i.test(text))
-    return [];
   const excluded =
     /\b(patient|vignette|diagnos\w*|treat\w*|dose|dosage|dosing|prescrib\w*|contraindicat\w*|triage|prognosis|management|next step|system prompt|ignore (?:all|previous)|instructions)\b|\bmg\s*\/\s*kg\b|https?:\/\/|\b\d+[- ]year[- ]old\b/i;
-  if (excluded.test(text)) return [];
-  let parts: ReturnType<typeof parseCloze>;
-  try {
-    parts = parseCloze(text);
-  } catch {
-    return [];
+  const fieldText = note.fields.map((raw) => {
+    if (/<(?:img|svg|audio|video|iframe|script)\b|\[sound:/i.test(raw))
+      return "";
+    const text = stripHtml(raw).trim();
+    if (
+      !text ||
+      text.length > 1200 ||
+      /^\s*(?:[a-f\d]{24,}|\d{8,})\s*$/i.test(text) ||
+      /\{\{(?!c\d+::)/i.test(text) ||
+      excluded.test(text)
+    )
+      return "";
+    return text;
+  });
+
+  // Cloze cards often keep their `Text` field after metadata, media, or an
+  // empty field. Every supported target remains tied to its exact field.
+  const clozeUnits: SourceUnit[] = [];
+  fieldText.forEach((text, field) => {
+    if (!text || !text.includes("{{")) return;
+    let parts: ReturnType<typeof parseCloze>;
+    try {
+      parts = parseCloze(text);
+    } catch {
+      return;
+    }
+    const targets = parts.filter((part) => part.kind === "cloze");
+    if (!targets.length || parts.some((part) => part.text.includes("{{")))
+      return;
+    const quote = parts.map((part) => part.text).join("");
+    for (const target of targets.slice(0, 8)) {
+      if (!target.text.trim() || target.text.length > 160) continue;
+      clozeUnits.push({
+        field,
+        quote: text,
+        prompt: parts
+          .map((part) => (part === target ? "_____" : part.text))
+          .join(""),
+        answer: target.text,
+        alternatives: [
+          ...new Set(
+            targets
+              .filter((part) => part.text !== target.text)
+              .map((part) => part.text),
+          ),
+        ]
+          .filter((value) => value.trim() && value.length <= 160)
+          .slice(0, 3),
+      });
+    }
+  });
+  if (clozeUnits.length) return clozeUnits;
+
+  // Fall back to the first pair of usable text fields. This accommodates
+  // legacy/basic note layouts with leading metadata or blank fields without
+  // sending images, tags, or unrelated notes to the model.
+  const promptField = fieldText.findIndex(
+    (text) => !!text && !text.includes("{{"),
+  );
+  if (promptField < 0) return [];
+  for (
+    let answerField = promptField + 1;
+    answerField < fieldText.length;
+    answerField++
+  ) {
+    const prompt = fieldText[promptField];
+    const answer = fieldText[answerField];
+    if (!answer || answer.includes("{{") || answer.length > 800) continue;
+    return [
+      {
+        field: promptField,
+        answerField,
+        quote: prompt,
+        prompt,
+        answer,
+        alternatives: [],
+      },
+    ];
   }
-  const targets = parts.filter((p) => p.kind === "cloze");
-  if (
-    text.includes("{{") &&
-    (!targets.length || parts.some((p) => p.text.includes("{{")))
-  )
-    return [];
-  if (targets.length) {
-    const quote = parts.map((p) => p.text).join("");
-    return targets
-      .slice(0, 8)
-      .flatMap((target) => {
-        if (!target.text.trim() || target.text.length > 160) return [];
-        return [
-          {
-            field: 0,
-            quote: text,
-            prompt: parts
-              .map((p) => (p === target ? "_____" : p.text))
-              .join(""),
-            answer: target.text,
-            alternatives: [
-              ...new Set(
-                targets
-                  .filter((p) => p.text !== target.text)
-                  .map((p) => p.text),
-              ),
-            ]
-              .filter((x) => x.trim() && x.length <= 160)
-              .slice(0, 3),
-          },
-        ];
-      })
-      .filter((u) => quote.length > u.answer.length);
-  }
-  const answer = stripHtml(note.fields[1] ?? "").trim();
-  if (
-    !answer ||
-    answer.length > 800 ||
-    /\{\{|\[sound:/i.test(answer) ||
-    excluded.test(answer)
-  )
-    return [];
-  return [{ field: 0, quote: text, prompt: text, answer, alternatives: [] }];
+  return [];
 }
 export function sourceVariants(note: Note): SourceVariant[] {
   const units = sourceUnits(note);
@@ -112,7 +140,7 @@ export function compileSourceActivity(
           {
             noteId: note.id,
             version: note.version,
-            field: 1,
+            field: unit.answerField ?? 1,
             quote: unit.answer,
           },
         ]

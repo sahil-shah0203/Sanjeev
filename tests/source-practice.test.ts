@@ -104,6 +104,45 @@ it("compiles four source-only formats, verifies every displayed field, and separ
     }
   }
 });
+it("finds supported clozes and basic front/back text after blank or metadata fields", async () => {
+  const { note } = await source();
+  const cloze = {
+    ...note,
+    fields: [
+      "",
+      "a1b2c3d4e5f607182930abcdef",
+      "A triangle has {{c1::three}} sides.",
+      "unused",
+    ],
+  };
+  const units = sourceUnits(cloze);
+  expect(units).toHaveLength(1);
+  expect(units[0].field).toBe(2);
+  const clozeActivity = compileSourceActivity(
+    cloze,
+    { unit: 0, variant: "recall" },
+    { id: id(), version: id(), modelVersion: "fixture" },
+  );
+  expect(clozeActivity.sources[0].field).toBe(2);
+
+  const basic = {
+    ...note,
+    fields: ["", "Name the planet described here.", "Earth", "unshared extra"],
+  };
+  const basicUnit = sourceUnits(basic)[0];
+  expect(basicUnit).toMatchObject({
+    field: 1,
+    answerField: 2,
+    answer: "Earth",
+  });
+  const basicActivity = compileSourceActivity(
+    basic,
+    { unit: 0, variant: "recall" },
+    { id: id(), version: id(), modelVersion: "fixture" },
+  );
+  expect(basicActivity.sources.map((source) => source.field)).toEqual([1, 2]);
+  expect(JSON.stringify(sourceUnits(basic))).not.toContain("unshared extra");
+});
 it("abstains for clinical decisions, malformed/large sources and unsupported choice formats", async () => {
   const { note } = await source();
   for (const text of [

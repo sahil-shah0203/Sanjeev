@@ -46,6 +46,33 @@ export async function prepareSourcePractice(
       a.sourceRecipe &&
       a.sources.some((s) => s.noteId === note.id && s.version === note.version),
   );
+  const priorCorrect = await Promise.all(
+    (await db.attempts.toArray())
+      .filter((attempt) => attempt.grade === "correct")
+      .map(async (attempt) => {
+        const activity = previous.find(
+          (candidate) => candidate.id === attempt.activityId,
+        );
+        return activity && validSourceActivity(activity, [note]);
+      }),
+  );
+  if (priorCorrect.some(Boolean)) {
+    const cards = await db.cards.where("noteId").equals(note.id).toArray();
+    const states = await db.states.bulkGet(cards.map((card) => card.id));
+    const nextDue = states
+      .map((state) => state?.memory.due)
+      .filter((due): due is string => !!due)
+      .map((due) => Date.parse(due))
+      .filter((due) => due > Date.now())
+      .sort((a, b) => a - b)[0];
+    if (nextDue) {
+      aiLog("question_spaced_until_fsrs_due", {
+        sessionId,
+        reason: "prior_correct_ai_practice",
+      });
+      return;
+    }
+  }
   if (previous.some((a) => ["quarantined", "rejected"].includes(a.status))) {
     aiLog("question_skipped", {
       sessionId,

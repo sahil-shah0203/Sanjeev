@@ -121,8 +121,8 @@ export default function Help() {
         <Link href="/" className="button primary">
           Back to Today
         </Link>
-        <Link href="/settings" className="button secondary">
-          Study preferences
+        <Link href="/account" className="button secondary">
+          Settings & account
         </Link>
       </div>
     </div>

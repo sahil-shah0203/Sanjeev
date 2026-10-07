@@ -60,16 +60,33 @@ export default function CardContent({
         : Promise.resolve([]),
     [db, note.namespace, names],
   );
-  const [prepared, setPrepared] = useState<{
+  const assetKey = assets
+    ?.map((asset) => `${asset.namespace}/${asset.name}/${asset.hash}`)
+    .join("\n");
+  const [assetSnapshot, setAssetSnapshot] = useState<{
+    key: string;
     assets: MediaAsset[];
+  }>();
+  useEffect(() => {
+    if (!assets || assetKey === undefined) return;
+    setAssetSnapshot((current) =>
+      current?.key === assetKey ? current : { key: assetKey, assets },
+    );
+  }, [assets, assetKey]);
+  const stableAssets =
+    assetSnapshot && assetSnapshot.key === assetKey
+      ? assetSnapshot.assets
+      : undefined;
+  const [prepared, setPrepared] = useState<{
+    key: string;
     urls: Map<string, string>;
   }>();
   const urls = useMemo(
     () =>
-      prepared && prepared.assets === assets
+      prepared && prepared.key === assetKey
         ? prepared.urls
         : new Map<string, string>(),
-    [prepared, assets],
+    [prepared, assetKey],
   );
   const [zoom, setZoom] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -77,8 +94,8 @@ export default function CardContent({
     let cancelled = false;
     const map = new Map<string, string>();
     const run = async () => {
-      if (!assets) return;
-      for (const asset of assets) {
+      if (!stableAssets || assetKey === undefined) return;
+      for (const asset of stableAssets) {
         if (!/^(?:image|audio|video)\//.test(asset.mime)) continue;
         let blob = asset.blob;
         // Validate again at display time, including media restored or synced
@@ -100,14 +117,14 @@ export default function CardContent({
         if (cancelled) return;
         map.set(asset.name, URL.createObjectURL(blob));
       }
-      if (!cancelled) setPrepared({ assets, urls: map });
+      if (!cancelled) setPrepared({ key: assetKey, urls: map });
     };
     void run();
     return () => {
       cancelled = true;
       for (const url of map.values()) URL.revokeObjectURL(url);
     };
-  }, [assets]);
+  }, [stableAssets, assetKey]);
   useEffect(() => {
     setZoom(null);
   }, [card.id, revealed]);
@@ -177,7 +194,7 @@ export default function CardContent({
             type={type}
             revealed={revealed}
             urls={urls}
-            loading={!assets || prepared?.assets !== assets}
+            loading={!stableAssets || prepared?.key !== assetKey}
           />
         )}
         {revealed && showExtras && output.extras.length > 0 && (

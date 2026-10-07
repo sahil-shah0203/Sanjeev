@@ -7,7 +7,6 @@ import {
   ChartNoAxesCombined,
   LibraryBig,
   Search,
-  Settings,
   CircleHelp,
   UserRound,
   ArrowUpRight,
@@ -72,17 +71,13 @@ function Shell() {
             <span className="status-dot" />
             <span>{syncStatus}</span>
           </div>
-          <Link href="/settings" className="nav-link">
-            <Settings size={19} />
-            Settings
-          </Link>
           <Link href="/account" className="account-row">
             <span className="avatar">
               {user?.email?.slice(0, 1).toUpperCase() ?? "G"}
             </span>
             <span>
               <strong>{user?.email?.split("@")[0] ?? "Guest workspace"}</strong>
-              <small>Account & data</small>
+              <small>Settings & account</small>
             </span>
             <ArrowUpRight size={15} />
           </Link>
@@ -95,16 +90,9 @@ function Shell() {
           </Link>
           <span className="topbar-motto">Your cards. Your next step.</span>
           <div className="topbar-actions">
-            <Link
-              href="/settings"
-              aria-label="Settings"
-              className="mobile-settings"
-            >
-              <Settings size={18} />
-            </Link>
             <Link href="/account" className="mobile-account">
               <UserRound size={15} />
-              Account & data
+              Settings & account
             </Link>
           </div>
         </header>
@@ -119,10 +107,8 @@ function Shell() {
             <Progress />
           ) : path === "/help" ? (
             <Help />
-          ) : path === "/account" ? (
-            <SettingsView key="account" account />
-          ) : path === "/settings" ? (
-            <SettingsView key="preferences" />
+          ) : path === "/account" || path === "/settings" ? (
+            <SettingsView key="account" />
           ) : path === "/review-content" ? (
             <ContentReview />
           ) : (

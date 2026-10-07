@@ -628,7 +628,9 @@ export default function Study() {
             {activity.sourceRecipe && (
               <p className="muted">
                 Check against your original source; it may contain errors. This
-                practice never changes your card schedule.
+                practice never changes your card schedule. A correct answer
+                spaces the next AI check until this source is due again in FSRS;
+                skipping has no effect.
               </p>
             )}
             <p className="muted">
