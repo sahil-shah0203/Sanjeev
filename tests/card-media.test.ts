@@ -8,6 +8,44 @@ import {
   peekCardMedia,
 } from "../apps/web/features/card-media";
 afterEach(() => vi.unstubAllGlobals());
+it("preserves a safe local image when speculative preload decoding fails", async () => {
+  const db = new Library(id());
+  try {
+    const bundle = await demoBundle();
+    const note = { ...bundle.notes[0], fields: ['<img src="mask.svg">'] };
+    const blob = new Blob(
+      [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="40" height="40" fill="red"/></svg>',
+      ],
+      { type: "image/svg+xml" },
+    );
+    await db.media.put({
+      id: id(),
+      namespace: note.namespace,
+      name: "mask.svg",
+      hash: "b".repeat(64),
+      mime: "image/svg+xml",
+      size: blob.size,
+      blob,
+    });
+    vi.stubGlobal(
+      "Image",
+      class {
+        src = "";
+        decode = vi
+          .fn()
+          .mockRejectedValue(new Error("Speculative decode interrupted"));
+      },
+    );
+    const prepared = await prepareCardMedia(db, note, bundle.types[0]);
+    expect(prepared.urls.get("mask.svg")).toMatch(/^blob:/);
+    expect(
+      (await prepareCardMedia(db, note, bundle.types[0])).urls.has("mask.svg"),
+    ).toBe(true);
+  } finally {
+    await db.delete();
+  }
+});
 it("waits for decode, reuses prepared media, and distinguishes real missing assets", async () => {
   const db = new Library(id());
   try {

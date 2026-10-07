@@ -104,8 +104,10 @@ export async function prepareCardMedia(
           image.src = url;
           await image.decode();
         } catch {
-          URL.revokeObjectURL(url);
-          continue;
+          // Preloading is best-effort. A transient decode failure must not
+          // erase an existing local asset or cache it as permanently missing.
+          // The actual image/mask renderer performs its own decode and safety
+          // checks before displaying any occluded content.
         }
       }
       urls.set(asset.name, url);
