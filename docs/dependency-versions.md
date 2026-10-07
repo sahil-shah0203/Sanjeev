@@ -8,6 +8,7 @@ Node recommended: 22.12+; exercised locally: 22.11.0 on Windows. Package manager
 | --- | --- | --- | --- |
 | @supabase/ssr | 0.12.7 | MIT | Runtime |
 | @supabase/supabase-js | 2.117.2 | MIT | Runtime |
+| @vercel/analytics | ^2.0.1 | MIT | Runtime |
 | @xmldom/xmldom | 0.9.12 | MIT | Runtime |
 | @zip.js/zip.js | 2.23.0 | BSD-3-Clause | Runtime |
 | dexie | 4.4.6 | Apache-2.0 | Runtime |
