@@ -57,6 +57,7 @@ import {
 import { Notice, Busy } from "../ui";
 import CardContent from "../CardContent";
 import AttemptFeedback from "../AttemptFeedback";
+import AiTypedText from "../AiTypedText";
 import { prepareCardMedia } from "../../features/card-media";
 type Item = { card: SourceCard; state: CardState; note: Note; type: NoteType };
 const ratings: RecallRating[] = ["again", "hard", "good", "easy"];
@@ -742,13 +743,17 @@ export default function Study() {
                 ? "AI-GENERATED · UNVERIFIED"
                 : "OPTIONAL PRACTICE"}
             </p>
-            <h2>{activity.stem}</h2>
+            <h2>
+              {activity.sourceRecipe ? (
+                <AiTypedText key={activity.id} text={activity.stem} />
+              ) : (
+                activity.stem
+              )}
+            </h2>
             {activity.sourceRecipe && (
               <p className="muted">
-                Check against your original source; it may contain errors. This
-                practice never changes your card schedule. Skipping has no
-                effect on FSRS. Your practice history helps select future AI
-                question styles.
+                Based on your deck. AI can be wrong; check the source. Answers
+                and skips leave your original FSRS schedule unchanged.
               </p>
             )}
             <p className="muted">
@@ -805,6 +810,11 @@ export default function Study() {
                   <label>
                     Your answer
                     <textarea
+                      placeholder={
+                        activity.format === "brief_explanation"
+                          ? "A sentence or two is enough. Explain it in your own words."
+                          : "Type your answer"
+                      }
                       value={adaptiveAnswer}
                       onChange={(e) => setAdaptiveAnswer(e.target.value)}
                     />
@@ -817,9 +827,6 @@ export default function Study() {
                 >
                   Check my answer
                 </button>
-                <button className="text-button" onClick={clearActivity}>
-                  Skip this check
-                </button>
               </>
             ) : (
               <>
@@ -827,7 +834,13 @@ export default function Study() {
                   {adaptiveResult.grade.replaceAll("_", " ")} ·{" "}
                   {adaptiveResult.feedback}
                 </Notice>
-                <p>{activity.rationale}</p>
+                <p>
+                  {activity.sourceRecipe ? (
+                    <AiTypedText text={activity.rationale} />
+                  ) : (
+                    activity.rationale
+                  )}
+                </p>
                 <AttemptFeedback
                   attempt={adaptiveResult}
                   sourceOnly={!!activity.sourceRecipe}

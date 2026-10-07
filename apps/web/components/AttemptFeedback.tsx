@@ -6,6 +6,7 @@ import { errorMessage } from "@recall/domain";
 import { useLibrary } from "./LibraryProvider";
 import { enqueue } from "../lib/db/local";
 import { Notice } from "./ui";
+import AiTypedText from "./AiTypedText";
 
 /** Model/self-check feedback is an annotation, never a scheduler write. */
 export default function AttemptFeedback({
@@ -119,11 +120,19 @@ export default function AttemptFeedback({
   return (
     <div className="attempt-feedback">
       {error && <Notice error>{error}</Notice>}
-      {message && <Notice>{message}</Notice>}
+      {message && (
+        <Notice>
+          {autoFeedback && message.startsWith("Model feedback") ? (
+            <AiTypedText text={message} />
+          ) : (
+            message
+          )}
+        </Notice>
+      )}
       {!message && saved?.modelGrade && (
         <Notice>
           AI suggestion ({saved.modelGrade.outcome.replaceAll("_", " ")}):{" "}
-          {saved.modelGrade.feedback}
+          <AiTypedText text={saved.modelGrade.feedback} />
         </Notice>
       )}
       {attempt.grade === "uncertain" && (

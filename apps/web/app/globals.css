@@ -171,6 +171,27 @@ kbd {
   white-space: nowrap;
   border: 0;
 }
+.ai-typed-visual {
+  display: grid;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-typed-layout,
+.ai-typed-copy {
+  grid-area: 1 / 1;
+}
+.ai-typed-layout {
+  visibility: hidden;
+  user-select: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-typed-layout {
+    visibility: visible;
+  }
+  .ai-typed-copy {
+    visibility: hidden;
+  }
+}
 .skip-link {
   position: fixed;
   top: 8px;

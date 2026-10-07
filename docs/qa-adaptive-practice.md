@@ -30,6 +30,8 @@ Multiple-choice grading uses the canonical source answer. Written responses can 
 
 Study prepares and decodes local media before changing the displayed original card, keeps the previous question visible during preparation, and preloads the next card. A bounded cache reuses prepared URLs. Genuinely missing, unsafe, or undecodable assets still show a media-unavailable state.
 
+AI questions, rationales, and written feedback use a brief letter-by-letter visual reveal, capped at 1.6 seconds. The full text reserves its layout space to avoid shifting answer controls. Reduced-motion preferences show it instantly, screen readers receive the complete text, and inputs remain usable throughout. This is a presentation effect after validation, not streamed unverified model output. The study form has a concise explanation prompt and a single skip control.
+
 ## Focused verification and friend testing
 
 Run type checking, lint, the deck-practice/source-practice/job/sync tests, and the production build. Tests use synthetic content and cover extraction, active clozes, immutable source validation, canonical MCQ keys, second-model rejection, unsupported feedback, budgets, idempotent attempts, reporting, and unchanged FSRS state.
