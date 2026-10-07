@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Sanjeev — your study space",
+  title: "Sanjeev AI — your study space",
   description:
     "A focused, local-first space for your Anki decks. Review with FSRS and optionally practice from your source notes.",
   manifest: "/manifest.webmanifest",

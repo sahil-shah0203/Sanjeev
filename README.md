@@ -1,6 +1,6 @@
-# Sanjeev
+# Sanjeev AI
 
-A local-first study application built from the two learning/build guides in this repository. It imports Anki packages, runs ordinary FSRS review offline, preserves source data, and offers optional source-based AI exercises. The Phase 4.5 interface uses warm paper colors, separates preferences from Account & data, and includes a short Help guide.
+A local-first study application built from the two learning/build guides in this repository. It imports Anki packages, runs ordinary FSRS review offline, preserves source data, and offers optional source-based AI exercises. The Phase 4.5 interface uses warm paper colors, combines study preferences and account controls, and includes a short Help guide.
 
 **Release status: Phase 4.5 technical beta.** Try [the deployed app](https://recall-sepia-seven.vercel.app). Vercel hosts the web app, Supabase provides Auth/Postgres/private Storage, and Railway runs the durable worker. Ordinary study requires neither login nor AI. This beta does not establish medical correctness, educational benefit, or universal Anki compatibility. See [Phase 4.5 behavior and verification](docs/phase-4.5-release.md), [friend testing](docs/beta-testing.md), and [remaining owner tasks](docs/manual-setup.md). Phase 5 and Phase 6 are outside this release.
 
@@ -33,7 +33,7 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 - Deterministic `ts-fsrs@5.4.2` scheduling, due/new separation, study-day rollover, sibling burying, keyboard review, durable atomic saves, undo, session resume, and no-attempt exposure tracking.
 - Browsing/search in a worker with paged results; note editing with revisions; suspend, bury, flag, and source reports.
 - Explicit fresh import or conservative replay of complete standard personal histories. First due calendar days are preserved in the confirmed export timezone. Incomplete, filtered, or manually rescheduled histories require a supported re-export or an explicit fresh start.
-- Explicit updates to a known collection without resetting Sanjeev schedules. Local edits remain preserved as conflicts. Changed templates/media require a separate collection.
+- Explicit updates to a known collection without resetting Sanjeev AI schedules. Local edits remain preserved as conflicts. Changed templates/media require a separate collection.
 - Checksummed native backup/clean-profile restore, including schedules, histories, local conflict proposals, media, and original archives present on this device. Content-only Anki export with transformation warnings.
 - Optional Supabase email authentication, owner-separated browser libraries, resumable guest copying, transactional server reconciliation, idempotent mutation receipts, paginated pulls, private media, and account deletion.
 - Optional source-grounded draft generation, persistent leased worker, quotas/spend reservations, protected human review and authoring, report resolution, deterministic grading/self-check, disputes, and bounded adaptive delivery. Normal review has no model dependency.
@@ -44,7 +44,7 @@ The repository also includes `pnpm-workspace.yaml` and a pinned `pnpm-lock.yaml`
 
 Read [import compatibility](docs/import-compatibility.md) before moving a real collection. All current container versions are handled; arbitrary add-on scripts, nested clozes, unsupported built-in occlusion shapes, active or unsupported SVG graphics, full Anki scheduling round trips, AnkiWeb sync, and AnkiHub updates remain outside the supported subset. Larger than 512 MiB packages must be exported as smaller selections; there is no hosted large-import service. The 414 MiB local version-2 regression sample imports all 1,437 cards and 3,738 media entries.
 
-History replay uses Sanjeev's pinned defaults, not a claim to reproduce every Anki scheduler configuration. Untested histories are preserved rather than guessed. The replay fixture corpus is synthetic; representative authorized personal histories still need validation.
+History replay uses Sanjeev AI's pinned defaults, not a claim to reproduce every Anki scheduler configuration. Untested histories are preserved rather than guessed. The replay fixture corpus is synthetic; representative authorized personal histories still need validation.
 
 Sync preserves a single canonical review chain and retains conflicting branches as audit history without double credit. Conflict export is available in Account & data; automatic merging of extended divergent histories is deliberately absent. Original `.apkg` archive Blobs remain on the importing device and in its native backup; cloud sync carries normalized source/raw metadata and media, not the archive Blob itself.
 

@@ -1,7 +1,8 @@
 # Phase 4.5 — Student-first UI and bounded AI study mode
 
 **Status:** Implementation brief for the next product pass  
-**Product:** Sanjeev (currently branded Recall in parts of the app)  
+**Product:** Sanjeev AI (previously branded Recall/Sanjeev in parts of the app)
+
 **Scope:** Learner-facing navigation, visual identity, settings simplification, tutorial/help, and a small opt-in AI question pilot grounded in a learner’s Anki content.
 
 This document turns the current product feedback into an implementation brief. It is a proposed beta iteration, not evidence that any study method improves learning. Read this alongside [`01_learning_research_and_product_rules.md`](../01_learning_research_and_product_rules.md), [`02_app_build_specification.md`](../02_app_build_specification.md), and [`phase-4-beta.md`](phase-4-beta.md). If a detail here conflicts with a safety or data-integrity rule in those documents, preserve the stronger safety/data rule and record the discrepancy.
@@ -12,13 +13,13 @@ Make the app understandable to a busy medical student on first use. A student sh
 
 The learner-facing promise should be modest and concrete:
 
-> **Sanjeev helps you keep using your Anki decks, review on your schedule, and optionally practice the same source material in a few different ways.**
+> **Sanjeev AI helps you keep using your Anki decks, review on your schedule, and optionally practice the same source material in a few different ways.**
 
-Keep the ordinary Anki-style review fast, local-first, available offline, and backed by the existing FSRS schedule. Optional AI practice is an experiment, not a replacement for the source card, a medical authority, or a proven learning advantage. Do not market Sanjeev as universally better than Anki. Describe which workflow it supports and evaluate learning claims with the research plan before making them.
+Keep the ordinary Anki-style review fast, local-first, available offline, and backed by the existing FSRS schedule. Optional AI practice is an experiment, not a replacement for the source card, a medical authority, or a proven learning advantage. Do not market Sanjeev AI as universally better than Anki. Describe which workflow it supports and evaluate learning claims with the research plan before making them.
 
 ## 2. Decisions for this pass
 
-1. Change the visible product name from **Recall** to **Sanjeev**.
+1. Change the visible product name from **Recall** to **Sanjeev AI**.
 2. Retain green as the recognizable action/accent color, but make warm beige and paper-like neutrals a substantial part of the learner interface.
 3. Simplify the learner’s main route to **Today, Decks, Browse, Progress, Help**. Keep account and data controls in one clearly labeled place.
 4. Remove duplicate import calls to action while keeping import obvious for a student with no decks.
@@ -66,11 +67,11 @@ Choose one persistent, consistent **Import deck** entry point, plus one contextu
 
 Keep import useful without an account. State supported file types and what happens to media in plain language. Errors should identify the file or compatibility issue and offer a next step; never silently discard a deck or overwrite existing data.
 
-## 5. Sanjeev identity and warm visual direction
+## 5. Sanjeev AI identity and warm visual direction
 
 ### Visible brand
 
-Update user-visible identity consistently: app wordmark, page title/metadata, PWA manifest name and short name, relevant accessible labels, and any visible product copy. Use **Sanjeev** consistently, with capitalization as shown. Review the icon and favicon for fit with the new identity; do not invent a separate visual language for each screen.
+Update user-visible identity consistently: app wordmark, page title/metadata, PWA manifest name and short name, relevant accessible labels, and any visible product copy. Use **Sanjeev AI** consistently, with capitalization as shown. Review the icon and favicon for fit with the new identity; do not invent a separate visual language for each screen.
 
 Before changing identifiers, classify them:
 
@@ -191,7 +192,7 @@ Use small examples or screenshots only if they are accurate and kept current. Ad
 The implementing LLM should inspect the current branch, working tree, repository guidance, and existing product specs first. Preserve existing user changes and secrets. Then work in reviewable vertical slices:
 
 1. Update the implementation checklist and confirm the current navigation, brand strings, settings state, flags, generation pipeline, scheduling boundary, and deployed configuration.
-2. Implement visible Sanjeev branding and the warm-neutral/green design tokens; test existing routes and backup/install compatibility.
+2. Implement visible Sanjeev AI branding and the warm-neutral/green design tokens; test existing routes and backup/install compatibility.
 3. Consolidate import entry points and separate learner navigation from account/data and reviewer tools.
 4. Simplify Settings and add the Help/Tutorial page.
 5. Implement the one-toggle study flow end to end behind flags, including the closed-source generation contract, source references, abstention, deterministic answer checking, report state, budget enforcement, offline/error fallback, and no-FSRS-credit guarantee.
@@ -210,7 +211,7 @@ The implementing LLM should inspect the current branch, working tree, repository
 
 ### Brand and navigation
 
-- Learner-visible product identity consistently says Sanjeev across app chrome and install metadata.
+- Learner-visible product identity consistently says Sanjeev AI across app chrome and install metadata.
 - Existing users’ local data, backups, imports, and cloud media remain readable; internal identifiers are not casually renamed.
 - A student can identify Today, Decks, Browse, Progress, Help, and Account & data without encountering duplicate links to the same Settings destination.
 - There is one consistent import flow; an empty library clearly invites import; import and ordinary study do not require login.

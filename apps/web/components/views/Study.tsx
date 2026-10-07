@@ -539,7 +539,7 @@ export default function Study() {
         </Link>
         <span className="study-brand">
           <BookOpen size={20} />
-          Sanjeev
+          Sanjeev AI
         </span>
         <span className="save-state">
           <span className="status-dot" />

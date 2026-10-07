@@ -1,10 +1,10 @@
-# Phase 4.5 — Sanjeev beta
+# Phase 4.5 — Sanjeev AI beta
 
 This iteration implements the [Phase 4.5 brief](phase-4.5-ui-and-study-mode.md). It does not claim Phase 5/6 completion, medical validation, or improved learning outcomes.
 
 ## Learner changes
 
-- Sanjeev identity, book icon, warm beige surfaces with green accents, and a warm dark theme.
+- Sanjeev AI identity, book icon, warm beige surfaces with green accents, and a warm dark theme.
 - Today holds deck/duration setup and the single optional AI switch. Starting from a deck retains that deck in Today’s setup. Import lives in Decks, with a prominent first-import action on an empty Today page.
 - `/settings` contains study preferences and collapsed advanced scheduling. `/account` contains optional sign-in, automatic sync, guest migration, backup/restore, conflict export and collapsed destructive actions. Old `/settings#account` and auth-return links still redirect appropriately.
 - `/help` explains importing, first review, FSRS ratings, shortcuts, optional AI, offline readiness and backups. It never blocks study. The generic “A few things to know” import panel was removed; the actual import preview still reports compatibility issues.

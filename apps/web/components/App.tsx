@@ -45,7 +45,7 @@ function Shell() {
           <span className="brand-mark">
             <BookOpen size={23} />
           </span>
-          Sanjeev
+          Sanjeev AI
         </Link>
         <p className="nav-caption">YOUR STUDY SPACE</p>
         <nav aria-label="Main navigation">
@@ -86,7 +86,7 @@ function Shell() {
       <div className="workspace">
         <header className="topbar">
           <Link href="/" className="mobile-brand">
-            Sanjeev
+            Sanjeev AI
           </Link>
           <span className="topbar-motto">Your cards. Your next step.</span>
           <div className="topbar-actions">
@@ -116,7 +116,7 @@ function Shell() {
           )}
         </main>
         <footer className="app-footer">
-          <span>Sanjeev · built around your study day.</span>
+          <span>Sanjeev AI · built around your study day.</span>
           <span>Beta · your progress stays yours.</span>
         </footer>
       </div>

@@ -113,7 +113,7 @@ export default function Help() {
             For offline study, open a deck and choose Check offline readiness
             while connected. Regular reviews work offline and sync on reconnect.
             Restore a native backup into an empty library. An Anki content
-            export does not include your Sanjeev review schedule.
+            export does not include your Sanjeev AI review schedule.
           </p>
         </li>
       </ol>
