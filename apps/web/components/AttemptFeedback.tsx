@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import type { Attempt } from "@recall/domain";
 import { errorMessage } from "@recall/domain";
 import { useLibrary } from "./LibraryProvider";
@@ -10,15 +11,23 @@ import { Notice } from "./ui";
 export default function AttemptFeedback({
   attempt,
   sourceOnly = false,
+  autoFeedback = false,
 }: {
   attempt: Attempt;
   sourceOnly?: boolean;
+  autoFeedback?: boolean;
 }) {
   const { db, user, prefs, sync, features } = useLibrary();
   const [job, setJob] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const requested = useRef(false);
+  const deadline = useRef(0);
+  const saved = useLiveQuery(
+    () => db.attempts.get(attempt.id),
+    [db, attempt.id],
+  );
   const selfCheck = async (value: string) => {
     try {
       await db.transaction("rw", db.attempts, db.outbox, async () => {
@@ -49,6 +58,7 @@ export default function AttemptFeedback({
       if (!response.ok)
         throw new Error(result.error?.message ?? "Feedback request failed.");
       setJob(result.id);
+      deadline.current = Date.now() + 130000;
       setMessage("Feedback queued. You can continue reviewing.");
     } catch (error) {
       setError(errorMessage(error));
@@ -56,9 +66,25 @@ export default function AttemptFeedback({
     }
   };
   useEffect(() => {
+    if (
+      autoFeedback &&
+      user &&
+      features.deckPractice &&
+      !requested.current &&
+      !saved?.modelGrade
+    ) {
+      requested.current = true;
+      void request();
+    }
+  }, [autoFeedback, user, features.deckPractice, saved?.modelGrade]);
+  useEffect(() => {
     if (!job) return;
     const timer = setInterval(async () => {
       try {
+        if (Date.now() > deadline.current)
+          throw new Error(
+            "Feedback is still processing. Your answer is saved; continue reviewing and check the source.",
+          );
         const response = await fetch(`/api/jobs/${job}`);
         const result = await response.json();
         if (!response.ok)
@@ -94,6 +120,12 @@ export default function AttemptFeedback({
     <div className="attempt-feedback">
       {error && <Notice error>{error}</Notice>}
       {message && <Notice>{message}</Notice>}
+      {!message && saved?.modelGrade && (
+        <Notice>
+          AI suggestion ({saved.modelGrade.outcome.replaceAll("_", " ")}):{" "}
+          {saved.modelGrade.feedback}
+        </Notice>
+      )}
       {attempt.grade === "uncertain" && (
         <div className="button-row">
           <button
@@ -110,11 +142,13 @@ export default function AttemptFeedback({
           </button>
         </div>
       )}
-      {!sourceOnly && user && prefs.aiConsent && features.generation && (
-        <button className="text-button" disabled={busy} onClick={request}>
-          {busy ? "Checking feedback…" : "Request rubric feedback"}
-        </button>
-      )}
+      {user &&
+        features.generation &&
+        (autoFeedback || (!sourceOnly && prefs.aiConsent)) && (
+          <button className="text-button" disabled={busy} onClick={request}>
+            {busy ? "Checking feedback…" : "Request rubric feedback"}
+          </button>
+        )}
     </div>
   );
 }

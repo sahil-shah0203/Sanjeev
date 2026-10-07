@@ -29,7 +29,11 @@ import {
 import { clozeCount, oneByOne } from "@recall/card-renderer";
 import { useClock } from "../../features/useClock";
 import { intervalLabel, preview } from "@recall/scheduler";
-import { sourceUnits, selectActivity } from "@recall/learning";
+import {
+  sourceUnits,
+  selectActivity,
+  DECK_PRACTICE_VERSION,
+} from "@recall/learning";
 import {
   prepareSourcePractice,
   selectSourcePractice,
@@ -53,6 +57,7 @@ import {
 import { Notice, Busy } from "../ui";
 import CardContent from "../CardContent";
 import AttemptFeedback from "../AttemptFeedback";
+import { prepareCardMedia } from "../../features/card-media";
 type Item = { card: SourceCard; state: CardState; note: Note; type: NoteType };
 const ratings: RecallRating[] = ["again", "hard", "good", "easy"];
 export default function Study() {
@@ -88,6 +93,8 @@ export default function Study() {
   const [helpNotice, setHelpNotice] = useState("");
   const [sourceOpen, setSourceOpen] = useState(false);
   const [aiNotice, setAiNotice] = useState("");
+  const [aiProgress, setAiProgress] = useState("");
+  const [aiReady, setAiReady] = useState(0);
   const aiController = useRef<AbortController | null>(null);
   const requestedSlots = useRef(new Set<number>());
   const loggedUnsupportedNotes = useRef(new Set<string>());
@@ -120,7 +127,20 @@ export default function Study() {
           throw new Error(
             "This card is missing source data. Restore a backup.",
           );
+        await prepareCardMedia(db, note, type);
         setItem({ ...selected, note, type });
+        const upcoming = queue.find(
+          (candidate) => candidate.card.id !== selected.card.id,
+        );
+        if (upcoming)
+          void db.notes
+            .get(upcoming.card.noteId)
+            .then(async (nextNote) => {
+              if (!nextNote) return;
+              const nextType = await db.types.get(nextNote.typeId);
+              if (nextType) await prepareCardMedia(db, nextNote, nextType);
+            })
+            .catch(() => {});
       } else setItem(null);
       setRevealed(false);
       setCount(0);
@@ -147,6 +167,70 @@ export default function Study() {
     return () => controller.abort();
   }, [sessionId]);
   useEffect(() => {
+    const preparing = (event: Event) => {
+      if ((event as CustomEvent).detail?.sessionId === sessionId)
+        setAiProgress("Preparing optional AI practice…");
+    };
+    const ready = (event: Event) => {
+      if ((event as CustomEvent).detail?.sessionId === sessionId) {
+        setAiProgress("AI practice ready for a review break.");
+        setAiReady((value) => value + 1);
+      }
+    };
+    window.addEventListener("sanjeev-ai-preparing", preparing);
+    window.addEventListener("sanjeev-ai-ready", ready);
+    return () => {
+      window.removeEventListener("sanjeev-ai-preparing", preparing);
+      window.removeEventListener("sanjeev-ai-ready", ready);
+    };
+  }, [sessionId]);
+  useEffect(() => {
+    if (
+      !aiReady ||
+      item ||
+      activity ||
+      finished ||
+      !session?.aiQuestions ||
+      session.aiPolicy !== DECK_PRACTICE_VERSION ||
+      busy ||
+      locked.current
+    )
+      return;
+    let active = true;
+    void selectSourcePractice(db, sessionId, "")
+      .then(async (candidate) => {
+        if (!candidate || !active) return;
+        const entry = await openIntervention(
+          db,
+          sessionId,
+          candidate,
+          "Optional source-grounded practice after your card reviews.",
+        );
+        if (!active) return;
+        activeMs.current = 0;
+        setElapsed(0);
+        setIntervention(entry);
+        setActivity(candidate);
+        setAiProgress("");
+      })
+      .catch((error) => {
+        if (active) setAiNotice(errorMessage(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    aiReady,
+    item,
+    activity,
+    finished,
+    session?.aiQuestions,
+    session?.aiPolicy,
+    db,
+    sessionId,
+    busy,
+  ]);
+  useEffect(() => {
     if (
       !session?.aiQuestions ||
       session.completed ||
@@ -156,6 +240,7 @@ export default function Study() {
       !navigator.onLine
     )
       return;
+    if (session.aiPolicy === DECK_PRACTICE_VERSION) return;
     const slot = Math.floor(session.reviews / 10);
     if (slot >= 3 || requestedSlots.current.has(slot)) return;
     if (!sourceUnits(item.note).length) {
@@ -204,8 +289,8 @@ export default function Study() {
       sessionId,
       provider: features.provider,
       online: navigator.onLine,
-      eligibleAfterReviews: 10,
-      maximumRequests: 3,
+      eligibleAfterReviews: session.aiPolicy === DECK_PRACTICE_VERSION ? 4 : 10,
+      maximumRequests: session.aiPolicy === DECK_PRACTICE_VERSION ? 6 : 3,
     });
   }, [
     session?.id,
@@ -365,6 +450,26 @@ export default function Study() {
       });
       setLastEvent(event.id);
       setLastCard(item.card.id);
+      if (
+        session.aiQuestions &&
+        session.aiPolicy === DECK_PRACTICE_VERSION &&
+        features.deckPractice &&
+        user &&
+        navigator.onLine
+      ) {
+        const signal = aiController.current?.signal;
+        if (signal)
+          void prepareSourcePractice(db, session.id, item.note, signal, {
+            review: event,
+            type: item.type,
+            card: item.card,
+          }).catch((error) => {
+            if (!signal.aborted) {
+              setAiProgress("");
+              setAiNotice(errorMessage(error));
+            }
+          });
+      }
       await load();
       const updated = await db.sessions.get(session.id);
       if (updated?.aiQuestions && features.adaptive) {
@@ -373,8 +478,9 @@ export default function Study() {
           (q) => q.state.memory.state === 1 || q.state.memory.state === 3,
         );
         if (
-          !learningDue &&
-          queue.filter((q) => q.state.memory.reps > 0).length <= 100
+          updated.aiPolicy === DECK_PRACTICE_VERSION ||
+          (!learningDue &&
+            queue.filter((q) => q.state.memory.reps > 0).length <= 100)
         ) {
           const bounded = features.sourcePractice
             ? await selectSourcePractice(db, updated.id, item.note.id)
@@ -410,12 +516,15 @@ export default function Study() {
               db,
               updated.id,
               candidate,
-              "A brief source exercise after ten original reviews.",
+              updated.aiPolicy === DECK_PRACTICE_VERSION
+                ? "A source-grounded activity selected from your rated card."
+                : "A brief source exercise after ten original reviews.",
             );
             activeMs.current = 0;
             setElapsed(0);
             setIntervention(entry);
             setActivity(candidate);
+            setAiProgress("");
           }
         }
       }
@@ -520,7 +629,11 @@ export default function Study() {
     }
   };
   useEffect(() => {
-    if (activity?.sourceRecipe && elapsed >= activity.expectedSeconds * 1000) {
+    if (
+      activity?.sourceRecipe &&
+      !activity.sourceRecipe.generated &&
+      elapsed >= activity.expectedSeconds * 1000
+    ) {
       void clearActivity();
       setAiNotice("Extra practice time is complete. Continue with your cards.");
     }
@@ -549,6 +662,11 @@ export default function Study() {
       <main className="study-main">
         {error && <Notice error>{error}</Notice>}
         {aiNotice && <Notice>{aiNotice}</Notice>}
+        {aiProgress && session?.aiQuestions && (
+          <p className="muted" role="status">
+            {aiProgress}
+          </p>
+        )}
         {session?.aiQuestions && !finished && (
           <div className="study-ai-status">
             <span className="muted">
@@ -628,9 +746,9 @@ export default function Study() {
             {activity.sourceRecipe && (
               <p className="muted">
                 Check against your original source; it may contain errors. This
-                practice never changes your card schedule. A correct answer
-                spaces the next AI check until this source is due again in FSRS;
-                skipping has no effect.
+                practice never changes your card schedule. Skipping has no
+                effect on FSRS. Your practice history helps select future AI
+                question styles.
               </p>
             )}
             <p className="muted">
@@ -713,6 +831,10 @@ export default function Study() {
                 <AttemptFeedback
                   attempt={adaptiveResult}
                   sourceOnly={!!activity.sourceRecipe}
+                  autoFeedback={
+                    !!activity.sourceRecipe?.generated &&
+                    activity.format !== "multiple_choice"
+                  }
                 />
                 {activity.rubric && (
                   <ul>
@@ -803,6 +925,7 @@ export default function Study() {
                   </button>
                 </div>
                 <CardContent
+                  key={`${item.card.id}:${item.note.version}`}
                   card={item.card}
                   note={item.note}
                   type={item.type}

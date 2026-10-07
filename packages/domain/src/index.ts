@@ -199,6 +199,7 @@ export interface StudySession {
   interventions?: Intervention[];
   aiQuestions?: boolean;
   aiRequests?: number;
+  aiPolicy?: string;
 }
 export interface Intervention {
   id: string;
@@ -293,6 +294,25 @@ export const ActivitySchema = z.object({
     .object({
       unit: z.number().int().nonnegative(),
       variant: z.enum(["recall", "recognition", "compare", "restate"]),
+      generated: z.boolean().optional(),
+    })
+    .optional(),
+  sourceContext: z
+    .object({
+      cardId: z.string().uuid(),
+      targetAnswer: z.string().min(1).max(1200),
+      reviewId: z.string().uuid(),
+      reviewsAtRequest: z.number().int().min(1),
+      style: z
+        .enum([
+          "recall",
+          "recognition",
+          "compare",
+          "restate",
+          "apply",
+          "repair",
+        ])
+        .optional(),
     })
     .optional(),
 });
@@ -317,6 +337,12 @@ export interface Attempt {
   objective?: string;
   selectionReason?: string;
   policy?: string;
+  modelGrade?: {
+    outcome: Grade;
+    feedback: string;
+    requiresSelfCheck: boolean;
+    sourceRefs?: string[];
+  };
 }
 export interface ContentReport {
   id: string;
@@ -550,7 +576,8 @@ export const recordSchemas = {
     seed: key,
     policy: key,
     aiQuestions: z.boolean().optional(),
-    aiRequests: z.number().int().min(0).max(3).optional(),
+    aiRequests: z.number().int().min(0).max(6).optional(),
+    aiPolicy: z.string().optional(),
     interventions: z
       .array(
         z.object({

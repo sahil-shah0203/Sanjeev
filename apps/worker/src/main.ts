@@ -2,7 +2,11 @@ import { Pool } from "pg";
 import { createServer } from "node:http";
 import { id, type Activity, type Note } from "@recall/domain";
 import { modelProvider } from "@recall/ai";
-import { validateActivity, validSourceActivity } from "@recall/learning";
+import {
+  validateActivity,
+  validSourceActivity,
+  DECK_PRACTICE_VERSION,
+} from "@recall/learning";
 import { publishWithLease } from "./leases";
 
 // Uses Node's built-in .env loader; never print credentials or source content.
@@ -41,7 +45,7 @@ process.on("SIGTERM", () => {
 });
 const log = (event: string, data: Record<string, unknown> = {}) =>
   console.log(JSON.stringify({ event, ...data, at: new Date().toISOString() }));
-async function reserveBudget(owner: string, jobId: string) {
+async function reserveBudget(owner: string, jobId: string, calls = 1) {
   if (process.env.LLM_PROVIDER === "fixture" || !process.env.LLM_PROVIDER)
     return;
   const limit = Number(process.env.LLM_DAILY_SPEND_LIMIT);
@@ -57,7 +61,7 @@ async function reserveBudget(owner: string, jobId: string) {
   )
     throw new Error("SPEND_CONFIGURATION_REQUIRED");
   // Worst-case byte-based upper bound; no automatic paid retries.
-  const reserve = (24000 * inputRate + 1800 * outputRate) / 1e6;
+  const reserve = (calls * (24000 * inputRate + 1800 * outputRate)) / 1e6;
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -100,7 +104,10 @@ async function execute(job: any) {
         [job.owner_id],
       )
     ).rows[0]?.value;
-    const bounded = job.input.mode === "source_practice";
+    const adaptive = job.input.mode === "deck_practice_v2";
+    const bounded = job.input.mode === "source_practice" || adaptive;
+    if (adaptive && process.env.ENABLE_DECK_PRACTICE !== "true")
+      throw new Error("GENERATION_DISABLED");
     if (bounded) {
       if (process.env.ENABLE_SOURCE_PRACTICE !== "true")
         throw new Error("GENERATION_DISABLED");
@@ -121,14 +128,55 @@ async function execute(job: any) {
     ).rows[0]?.value as Note | undefined;
     if (!note || note.version !== job.input.version)
       throw new Error("SOURCE_CHANGED");
-    await reserveBudget(job.owner_id, job.id);
-    const result = bounded
-      ? await modelProvider().sourcePractice(note, job.input.variant)
-      : await modelProvider().generate(
-          [note],
-          job.input.task,
-          job.input.format,
-        );
+    const type = adaptive
+      ? (
+          await pool.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='types' AND id=$2 AND deleted=false",
+            [job.owner_id, note.typeId],
+          )
+        ).rows[0]?.value
+      : undefined;
+    const card = adaptive
+      ? (
+          await pool.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='cards' AND id=$2 AND deleted=false",
+            [job.owner_id, job.input.cardId],
+          )
+        ).rows[0]?.value
+      : undefined;
+    const review = adaptive
+      ? (
+          await pool.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='reviews' AND id=$2 AND deleted=false",
+            [job.owner_id, job.input.sourceContext?.reviewId],
+          )
+        ).rows[0]?.value
+      : undefined;
+    if (
+      adaptive &&
+      (!type ||
+        card?.noteId !== note.id ||
+        review?.cardId !== card.id ||
+        review.contentVersion !== note.version ||
+        ["undone", "concurrent"].includes(review.status))
+    )
+      throw new Error("SOURCE_CHANGED");
+    await reserveBudget(job.owner_id, job.id, adaptive ? 2 : 1);
+    const result = adaptive
+      ? await modelProvider().deckPractice(
+          note,
+          type,
+          card,
+          job.input.variant,
+          job.input.sourceContext,
+        )
+      : bounded
+        ? await modelProvider().sourcePractice(note, job.input.variant)
+        : await modelProvider().generate(
+            [note],
+            job.input.task,
+            job.input.format,
+          );
     if (result.activity) {
       const errors = validateActivity(result.activity, [note]);
       if (bounded && !validSourceActivity(result.activity, [note]))
@@ -156,6 +204,19 @@ async function execute(job: any) {
           ).rows[0]?.value;
           if (!s?.aiQuestions || s.completed)
             throw new Error("CONSENT_REQUIRED");
+          if (adaptive) {
+            const sourceReview = (
+              await db.query(
+                "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='reviews' AND id=$2 AND deleted=false",
+                [job.owner_id, job.input.sourceContext.reviewId],
+              )
+            ).rows[0]?.value;
+            if (
+              !sourceReview ||
+              ["undone", "concurrent"].includes(sourceReview.status)
+            )
+              throw new Error("SOURCE_CHANGED");
+          }
         }
         return db.query(
           "INSERT INTO public.documents(owner_id,entity,id,value) VALUES($1,'activities',$2,$3) ON CONFLICT(owner_id,entity,id) DO NOTHING",
@@ -178,7 +239,8 @@ async function execute(job: any) {
         [job.owner_id],
       )
     ).rows[0]?.value;
-    if (!prefs?.aiConsent) throw new Error("CONSENT_REQUIRED");
+    const adaptive = job.input.mode === "deck_feedback_v2";
+    if (!adaptive && !prefs?.aiConsent) throw new Error("CONSENT_REQUIRED");
     const attempt = (
       await pool.query(
         "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='attempts' AND id=$2",
@@ -191,15 +253,43 @@ async function execute(job: any) {
         [job.owner_id, attempt?.activityId],
       )
     ).rows[0]?.value as Activity | undefined;
+    const s =
+      adaptive && attempt
+        ? (
+            await pool.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='sessions' AND id=$2 AND deleted=false",
+              [job.owner_id, attempt.sessionId],
+            )
+          ).rows[0]?.value
+        : undefined;
+    const notes =
+      adaptive && activity
+        ? (
+            await pool.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='notes' AND id=$2 AND deleted=false",
+              [job.owner_id, activity.sources[0].noteId],
+            )
+          ).rows.map((row) => row.value)
+        : [];
+    if (
+      adaptive &&
+      (process.env.ENABLE_DECK_PRACTICE !== "true" ||
+        !s?.aiQuestions ||
+        s.completed ||
+        s.aiPolicy !== DECK_PRACTICE_VERSION ||
+        !activity?.sourceRecipe?.generated ||
+        !validSourceActivity(activity, notes))
+    )
+      throw new Error("CONSENT_REQUIRED");
     if (
       !attempt ||
       !activity ||
-      activity.status !== "human_approved" ||
-      activity.sourceRecipe ||
+      (!adaptive &&
+        (activity.status !== "human_approved" || activity.sourceRecipe)) ||
       activity.version !== attempt.activityVersion
     )
       throw new Error("APPROVED_ACTIVITY_REQUIRED");
-    await reserveBudget(job.owner_id, job.id);
+    await reserveBudget(job.owner_id, job.id, adaptive ? 2 : 1);
     const grade = await modelProvider().grade(
       activity,
       String(attempt.answer).slice(0, 4000),
@@ -212,10 +302,38 @@ async function execute(job: any) {
         )
       ).rows[0]?.value;
       if (
-        current?.status !== "human_approved" ||
+        current?.status !== (adaptive ? "source_bounded" : "human_approved") ||
         current.version !== activity.version
       )
         throw new Error("APPROVED_ACTIVITY_REQUIRED");
+      if (adaptive) {
+        const session = (
+          await db.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='sessions' AND id=$2 AND deleted=false",
+            [job.owner_id, attempt.sessionId],
+          )
+        ).rows[0]?.value;
+        const note = (
+          await db.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='notes' AND id=$2 AND deleted=false",
+            [job.owner_id, activity.sources[0].noteId],
+          )
+        ).rows[0]?.value;
+        const answer = (
+          await db.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='attempts' AND id=$2 AND deleted=false",
+            [job.owner_id, attempt.id],
+          )
+        ).rows[0]?.value;
+        if (
+          !session?.aiQuestions ||
+          session.completed ||
+          !note ||
+          !validSourceActivity(current, [note]) ||
+          answer?.answer !== attempt.answer
+        )
+          throw new Error("SOURCE_CHANGED");
+      }
       return db.query(
         "UPDATE public.documents SET value=value || $3::jsonb,row_version=row_version+1,updated_at=now() WHERE owner_id=$1 AND entity='attempts' AND id=$2",
         [job.owner_id, attempt.id, JSON.stringify({ modelGrade: grade })],

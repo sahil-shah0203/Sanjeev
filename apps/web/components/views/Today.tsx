@@ -16,11 +16,12 @@ import {
 import { useLibrary } from "../LibraryProvider";
 import { commitImport, eligibleCards, startSession } from "../../lib/db/local";
 import { studyDay } from "@recall/scheduler";
+import { DECK_PRACTICE_VERSION } from "@recall/learning";
 import { demoBundle } from "../../features/demo";
 import AiStudyToggle from "../AiStudyToggle";
 import { PageTitle, Notice } from "../ui";
 export default function Today() {
-  const { db, prefs } = useLibrary();
+  const { db, prefs, features } = useLibrary();
   const [ai, setAi] = useState(false);
   const tick = useClock();
   const router = useRouter();
@@ -62,7 +63,13 @@ export default function Today() {
   const begin = async () => {
     setBusy(true);
     try {
-      const session = await startSession(db, scope, budget, ai);
+      const session = await startSession(
+        db,
+        scope,
+        budget,
+        ai,
+        features.deckPractice ? DECK_PRACTICE_VERSION : undefined,
+      );
       router.push(`/study/${session.id}`);
     } catch (e) {
       setError(String(e));

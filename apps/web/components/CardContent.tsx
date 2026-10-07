@@ -13,7 +13,11 @@ import { useLibrary } from "./LibraryProvider";
 import OcclusionImage from "./OcclusionImage";
 import EnhancedOcclusionImage from "./EnhancedOcclusionImage";
 import { isEnhancedOcclusion } from "../../../packages/card-renderer/src/enhanced-occlusion";
-import { looksLikeSvg, safeSvg } from "../../../packages/card-renderer/src/svg";
+import {
+  peekCardMedia,
+  prepareCardMedia,
+  retainCardMedia,
+} from "../features/card-media";
 export default function CardContent({
   card,
   note,
@@ -77,54 +81,38 @@ export default function CardContent({
     assetSnapshot && assetSnapshot.key === assetKey
       ? assetSnapshot.assets
       : undefined;
-  const [prepared, setPrepared] = useState<{
-    key: string;
-    urls: Map<string, string>;
-  }>();
+  const [prepared, setPrepared] = useState<
+    | {
+        key: string;
+        urls: Map<string, string>;
+      }
+    | undefined
+  >(() => {
+    const media = peekCardMedia(db, note, type);
+    return media ? { key: media.signature, urls: media.urls } : undefined;
+  });
   const urls = useMemo(
-    () =>
-      prepared && prepared.key === assetKey
-        ? prepared.urls
-        : new Map<string, string>(),
-    [prepared, assetKey],
+    () => (prepared ? prepared.urls : new Map<string, string>()),
+    [prepared],
   );
   const [zoom, setZoom] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    let cancelled = false;
-    const map = new Map<string, string>();
-    const run = async () => {
-      if (!stableAssets || assetKey === undefined) return;
-      for (const asset of stableAssets) {
-        if (!/^(?:image|audio|video)\//.test(asset.mime)) continue;
-        let blob = asset.blob;
-        // Validate again at display time, including media restored or synced
-        // from another client. Only a rebuilt, resource-free SVG becomes a URL.
-        if (
-          asset.mime === "image/svg+xml" ||
-          /\.svg$/i.test(asset.name) ||
-          looksLikeSvg(new Uint8Array(await blob.slice(0, 4096).arrayBuffer()))
-        ) {
-          try {
-            if (blob.size > 1024 * 1024) continue;
-            blob = new Blob([safeSvg(await blob.text())], {
-              type: "image/svg+xml",
-            });
-          } catch {
-            continue;
-          }
-        }
-        if (cancelled) return;
-        map.set(asset.name, URL.createObjectURL(blob));
-      }
-      if (!cancelled) setPrepared({ key: assetKey, urls: map });
-    };
-    void run();
+    let active = true;
+    if (stableAssets)
+      void prepareCardMedia(db, note, type)
+        .then((media) => {
+          if (active) setPrepared({ key: media.signature, urls: media.urls });
+        })
+        .catch(() => {});
     return () => {
-      cancelled = true;
-      for (const url of map.values()) URL.revokeObjectURL(url);
+      active = false;
     };
-  }, [stableAssets, assetKey]);
+  }, [db, note, type, stableAssets, assetKey]);
+  useEffect(
+    () => (prepared ? retainCardMedia(prepared.urls) : undefined),
+    [prepared?.urls],
+  );
   useEffect(() => {
     setZoom(null);
   }, [card.id, revealed]);
@@ -155,6 +143,12 @@ export default function CardContent({
     return (
       <p role="alert" className="notice error">
         {output.error}
+      </p>
+    );
+  if (!prepared && names.length)
+    return (
+      <p className="muted" role="status">
+        Preparing card media…
       </p>
     );
   return (
@@ -194,7 +188,7 @@ export default function CardContent({
             type={type}
             revealed={revealed}
             urls={urls}
-            loading={!stableAssets || prepared?.key !== assetKey}
+            loading={!prepared}
           />
         )}
         {revealed && showExtras && output.extras.length > 0 && (

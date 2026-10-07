@@ -2,7 +2,7 @@
 
 A local-first study application built from the two learning/build guides in this repository. It imports Anki packages, runs ordinary FSRS review offline, preserves source data, and offers optional source-based AI exercises. The Phase 4.5 interface uses warm paper colors, combines study preferences and account controls, and includes a short Help guide.
 
-**Release status: Phase 4.5 technical beta.** Try [the deployed app](https://recall-sepia-seven.vercel.app). Vercel hosts the web app, Supabase provides Auth/Postgres/private Storage, and Railway runs the durable worker. Ordinary study requires neither login nor AI. This beta does not establish medical correctness, educational benefit, or universal Anki compatibility. See [Phase 4.5 behavior and verification](docs/phase-4.5-release.md), [friend testing](docs/beta-testing.md), and [remaining owner tasks](docs/manual-setup.md). Phase 5 and Phase 6 are outside this release.
+**Release status: Phase 4.5 technical beta.** Try [production](https://sanjeevstudy.com) or [QA](https://sanjeev-qa.vercel.app). Vercel hosts the web app, Supabase provides Auth/Postgres/private Storage, and Railway runs the durable worker. Ordinary study requires neither login nor AI. This beta does not establish medical correctness, educational benefit, or universal Anki compatibility. See [QA adaptive practice](docs/qa-adaptive-practice.md), [Phase 4.5 behavior and verification](docs/phase-4.5-release.md), [friend testing](docs/beta-testing.md), and [remaining owner tasks](docs/manual-setup.md). Phase 5 and Phase 6 are outside this release.
 
 ## Run it
 

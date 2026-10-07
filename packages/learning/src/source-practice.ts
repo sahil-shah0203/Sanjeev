@@ -6,6 +6,7 @@ import {
   type StudySession,
 } from "@recall/domain";
 import { parseCloze, stripHtml } from "@recall/card-renderer";
+import { DECK_PRACTICE_VERSION, validDeckActivity } from "./deck-practice";
 
 export const SOURCE_PRACTICE_VERSION = "source-exercise-1";
 export type SourceVariant = "recall" | "recognition" | "compare" | "restate";
@@ -221,6 +222,8 @@ export function validSourceActivity(
   activity: Activity,
   notes: Note[],
 ): boolean {
+  if (activity.sourceRecipe?.generated)
+    return validDeckActivity(activity, notes);
   if (
     activity.status !== "source_bounded" ||
     !activity.sourceRecipe ||
@@ -245,13 +248,14 @@ export function validSourceActivity(
   }
 }
 export function sourceBudgetFits(session: StudySession, seconds: number) {
+  const adaptive = session.aiPolicy === DECK_PRACTICE_VERSION;
   return (
     session.aiQuestions === true &&
     !session.completed &&
     session.budgetMinutes >= 5 &&
-    session.checks < Math.floor(session.reviews / 10) &&
+    session.checks < Math.floor(session.reviews / (adaptive ? 4 : 10)) &&
     session.interventionMs + seconds * 1000 <=
-      session.budgetMinutes * 60000 * 0.15 &&
+      session.budgetMinutes * 60000 * (adaptive ? 0.2 : 0.15) &&
     session.activeMs + session.interventionMs + seconds * 1000 <=
       session.budgetMinutes * 60000
   );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 export function GET() {
   return NextResponse.json({
     adaptive: process.env.ENABLE_ADAPTIVE_PRACTICE === "true",
+    deckPractice: process.env.ENABLE_DECK_PRACTICE === "true",
     generation: process.env.ENABLE_AI_GENERATION === "true",
     sourcePractice:
       process.env.ENABLE_SOURCE_PRACTICE === "true" &&

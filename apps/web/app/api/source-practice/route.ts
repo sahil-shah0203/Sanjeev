@@ -10,7 +10,15 @@ export async function POST(request: Request) {
         noteId: z.string().uuid(),
         sessionId: z.string().uuid(),
         consent: z.literal(true),
-        variant: z.enum(["recall", "recognition", "compare", "restate"]),
+        variant: z.enum([
+          "recall",
+          "recognition",
+          "compare",
+          "restate",
+          "apply",
+          "repair",
+        ]),
+        reviewId: z.string().uuid().optional(),
       })
       .strict()
       .parse(await body(request, 2048));

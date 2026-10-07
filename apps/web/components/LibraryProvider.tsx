@@ -21,6 +21,7 @@ type Context = {
     adaptive: boolean;
     generation: boolean;
     sourcePractice: boolean;
+    deckPractice: boolean;
     provider: string;
   };
   sync: () => Promise<void>;
@@ -47,6 +48,7 @@ function Ready({
     adaptive: false,
     generation: false,
     sourcePractice: false,
+    deckPractice: false,
     provider: "the configured provider",
   });
   useEffect(() => {
@@ -62,6 +64,7 @@ function Ready({
           adaptive: value.adaptive === true,
           generation: value.generation === true,
           sourcePractice: value.sourcePractice === true,
+          deckPractice: value.deckPractice === true,
           provider:
             value.provider === "OpenAI"
               ? "OpenAI"

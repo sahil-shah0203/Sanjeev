@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { identity, body, failure, HttpError } from "../../../lib/server/auth";
 import { transaction } from "../../../lib/server/database";
+import { DECK_PRACTICE_VERSION, validSourceActivity } from "@recall/learning";
 export async function POST(request: Request) {
   try {
     const { user } = await identity(request);
@@ -24,7 +25,26 @@ export async function POST(request: Request) {
           [user.id],
         )
       ).rows[0]?.value;
-      if (!preferences?.aiConsent)
+      const attemptRow = (
+        await db.query(
+          "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='attempts' AND id=$2 AND deleted=false",
+          [user.id, attemptId],
+        )
+      ).rows[0]?.value;
+      const session = attemptRow
+        ? (
+            await db.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='sessions' AND id=$2 AND deleted=false",
+              [user.id, attemptRow.sessionId],
+            )
+          ).rows[0]?.value
+        : undefined;
+      const adaptive =
+        process.env.ENABLE_DECK_PRACTICE === "true" &&
+        session?.aiPolicy === DECK_PRACTICE_VERSION &&
+        session.aiQuestions &&
+        !session.completed;
+      if (!adaptive && !preferences?.aiConsent)
         throw new HttpError(
           403,
           "CONSENT_REQUIRED",
@@ -69,10 +89,21 @@ export async function POST(request: Request) {
           [user.id, attempt.value.activityId],
         )
       ).rows[0]?.value;
+      const notes =
+        adaptive && activity
+          ? (
+              await db.query(
+                "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='notes' AND id=$2 AND deleted=false",
+                [user.id, activity.sources[0].noteId],
+              )
+            ).rows.map((row) => row.value)
+          : [];
       if (
         !activity ||
-        activity.status !== "human_approved" ||
-        activity.sourceRecipe
+        (adaptive
+          ? !activity.sourceRecipe?.generated ||
+            !validSourceActivity(activity, notes)
+          : activity.status !== "human_approved" || activity.sourceRecipe)
       )
         throw new HttpError(
           403,
@@ -82,7 +113,14 @@ export async function POST(request: Request) {
       return (
         await db.query(
           "INSERT INTO public.jobs(owner_id,kind,idempotency_key,input,max_attempts) VALUES($1,'grade',$2,$3,1) ON CONFLICT(owner_id,idempotency_key) DO UPDATE SET idempotency_key=excluded.idempotency_key RETURNING id,status",
-          [user.id, `grade:${attemptId}`, JSON.stringify({ attemptId })],
+          [
+            user.id,
+            `grade:${attemptId}`,
+            JSON.stringify({
+              attemptId,
+              ...(adaptive ? { mode: "deck_feedback_v2" } : {}),
+            }),
+          ],
         )
       ).rows[0];
     });

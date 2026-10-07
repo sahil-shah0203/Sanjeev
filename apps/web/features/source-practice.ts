@@ -1,9 +1,19 @@
-import { type Activity, type Note, now } from "@recall/domain";
+import {
+  type Activity,
+  type Note,
+  type NoteType,
+  type SourceCard,
+  type ReviewEvent,
+  now,
+} from "@recall/domain";
 import {
   sourceUnits,
   sourceVariants,
   sourceBudgetFits,
   validSourceActivity,
+  DECK_PRACTICE_VERSION,
+  deckSource,
+  chooseDeckVariant,
 } from "@recall/learning";
 import { Library, enqueue } from "../lib/db/local";
 import { syncLibrary } from "./sync";
@@ -22,18 +32,26 @@ export async function prepareSourcePractice(
   sessionId: string,
   note: Note,
   signal: AbortSignal,
+  reviewed?: { review: ReviewEvent; type: NoteType; card: SourceCard },
 ) {
   const session = await db.sessions.get(sessionId);
   if (!session?.aiQuestions || session.completed || !navigator.onLine) return;
-  if (!sourceUnits(note).length) {
+  const adaptive = session.aiPolicy === DECK_PRACTICE_VERSION;
+  const source =
+    adaptive && reviewed
+      ? deckSource(note, reviewed.type, reviewed.card)
+      : undefined;
+  if (adaptive ? !source : !sourceUnits(note).length) {
     aiLog("question_skipped", {
       sessionId,
       reason: "note_has_no_supported_source_text",
     });
     return;
   }
-  const slot = Math.floor(session.reviews / 10);
-  if (slot >= 3) {
+  const slot = Math.floor(
+    Math.max(0, session.reviews - (adaptive ? 1 : 0)) / (adaptive ? 4 : 10),
+  );
+  if (adaptive ? (session.aiRequests ?? 0) >= 6 : slot >= 3) {
     aiLog("request_skipped", {
       sessionId,
       slot,
@@ -56,7 +74,7 @@ export async function prepareSourcePractice(
         return activity && validSourceActivity(activity, [note]);
       }),
   );
-  if (priorCorrect.some(Boolean)) {
+  if (!adaptive && priorCorrect.some(Boolean)) {
     const cards = await db.cards.where("noteId").equals(note.id).toArray();
     const states = await db.states.bulkGet(cards.map((card) => card.id));
     const nextDue = states
@@ -82,7 +100,17 @@ export async function prepareSourcePractice(
     return;
   }
   const variants = sourceVariants(note);
-  const variant = variants[(previous.length + slot) % variants.length];
+  const variant = adaptive
+    ? chooseDeckVariant(
+        reviewed!.review.rating,
+        (await db.attempts.toArray()).filter((attempt) =>
+          previous.some((activity) => activity.id === attempt.activityId),
+        ),
+        previous,
+        source!,
+        slot,
+      )
+    : variants[(previous.length + slot) % variants.length];
   const reserved = await db.transaction(
     "rw",
     db.meta,
@@ -95,7 +123,7 @@ export async function prepareSourcePractice(
       if (
         !current?.aiQuestions ||
         current.completed ||
-        (current.aiRequests ?? 0) >= 3
+        (current.aiRequests ?? 0) >= (adaptive ? 6 : 3)
       )
         return "session_disabled" as const;
       await db.meta.put({
@@ -122,6 +150,10 @@ export async function prepareSourcePractice(
     variant,
     provider: "server_configured",
   });
+  if (adaptive && typeof window !== "undefined")
+    window.dispatchEvent(
+      new CustomEvent("sanjeev-ai-preparing", { detail: { sessionId } }),
+    );
   await syncLibrary(db, () => {});
   if (signal.aborted) {
     aiLog("request_aborted", {
@@ -142,6 +174,7 @@ export async function prepareSourcePractice(
       noteId: note.id,
       variant,
       consent: true,
+      ...(adaptive ? { reviewId: reviewed!.review.id } : {}),
     }),
   });
   const result = await response.json();
@@ -153,7 +186,7 @@ export async function prepareSourcePractice(
     );
   }
   aiLog("request_accepted", { sessionId, slot, jobId: result.id });
-  const deadline = Date.now() + 65000;
+  const deadline = Date.now() + (adaptive ? 125000 : 65000);
   while (!signal.aborted && Date.now() < deadline) {
     const jobResponse = await fetch(`/api/jobs/${result.id}`, { signal });
     if (!jobResponse.ok)
@@ -177,6 +210,10 @@ export async function prepareSourcePractice(
         jobId: result.id,
         activityId: job.output.activityId,
       });
+      if (typeof window !== "undefined")
+        window.dispatchEvent(
+          new CustomEvent("sanjeev-ai-ready", { detail: { sessionId } }),
+        );
       return;
     }
     if (["failed", "cancelled", "cancel_requested"].includes(job.status)) {
@@ -218,7 +255,11 @@ export async function selectSourcePractice(
     (a) =>
       validSourceActivity(a, notes) &&
       sourceBudgetFits(session, a.expectedSeconds) &&
-      (a.format !== "brief_explanation" || session.teachbacks < 1) &&
+      (session.aiPolicy === DECK_PRACTICE_VERSION ||
+        a.format !== "brief_explanation" ||
+        session.teachbacks < 1) &&
+      (!a.sourceContext ||
+        session.reviews - a.sourceContext.reviewsAtRequest >= 2) &&
       !session.interventions?.some((i) => i.activityId === a.id),
   );
   // Use material already reviewed in this session. Do not leak an upcoming card answer.
@@ -227,8 +268,21 @@ export async function selectSourcePractice(
       .filter((r) => r.status !== "undone" && r.status !== "concurrent")
       .map((r) => r.noteId),
   );
+  const reviews = await db.reviews
+    .where("sessionId")
+    .equals(sessionId)
+    .toArray();
   return candidates
-    .filter((a) => a.sources.every((s) => reviewed.has(s.noteId)))
+    .filter(
+      (a) =>
+        a.sources.every((s) => reviewed.has(s.noteId)) &&
+        (!a.sourceContext ||
+          reviews.some(
+            (review) =>
+              review.id === a.sourceContext?.reviewId &&
+              !["undone", "concurrent"].includes(review.status),
+          )),
+    )
     .sort(
       (a: Activity, b: Activity) =>
         Number(b.sources.some((s) => s.noteId === reviewedNoteId)) -

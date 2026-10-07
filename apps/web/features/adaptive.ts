@@ -12,6 +12,7 @@ import {
   validateActivity,
   validSourceActivity,
   sourceBudgetFits,
+  DECK_PRACTICE_VERSION,
 } from "@recall/learning";
 import { Library, enqueue } from "../lib/db/local";
 
@@ -56,7 +57,8 @@ export async function openIntervention(
       if (
         bounded
           ? !sourceBudgetFits(session, current.expectedSeconds) ||
-            (current.format === "brief_explanation" &&
+            (!current.sourceRecipe?.generated &&
+              current.format === "brief_explanation" &&
               session.teachbacks >= 1) ||
             session.interventions?.some((i) => i.activityId === current.id)
           : !requested &&
@@ -76,7 +78,11 @@ export async function openIntervention(
         activityId: current.id,
         activityVersion: current.version,
         reason,
-        policy: bounded ? "source-exercise-1" : ADAPTIVE_POLICY,
+        policy: current.sourceRecipe?.generated
+          ? DECK_PRACTICE_VERSION
+          : bounded
+            ? "source-exercise-1"
+            : ADAPTIVE_POLICY,
         startedAt: now(),
         durationMs: 0,
         expectedMs: current.expectedSeconds * 1000,

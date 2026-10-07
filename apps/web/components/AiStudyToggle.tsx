@@ -46,6 +46,8 @@ export default function AiStudyToggle({
       <p id="ai-summary">
         Brief questions from your deck. They may be wrong. Your card schedule
         stays the same.
+        {features.deckPractice &&
+          " Optional practice is offered around every four reviews when supported by your source."}
       </p>
       {!features.sourcePractice ? (
         <p>

@@ -8,6 +8,14 @@ import {
 } from "@recall/domain";
 import { stripHtml } from "@recall/card-renderer";
 export {
+  DECK_PRACTICE_VERSION,
+  deckSource,
+  validDeckActivity,
+  chooseDeckVariant,
+  type DeckVariant,
+  type DeckSource,
+} from "./deck-practice";
+export {
   compileSourceActivity,
   validSourceActivity,
   sourceBudgetFits,

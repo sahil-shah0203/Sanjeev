@@ -4,6 +4,9 @@ import {
   sourceUnits,
   sourceVariants,
   type SourceVariant,
+  DECK_PRACTICE_VERSION,
+  deckSource,
+  type DeckVariant,
 } from "@recall/learning";
 import { transaction } from "./database";
 import { HttpError } from "./auth";
@@ -13,7 +16,8 @@ export async function enqueueSourcePractice(
     noteId: string;
     sessionId: string;
     consent: true;
-    variant: SourceVariant;
+    variant: DeckVariant;
+    reviewId?: string;
   },
 ) {
   if (
@@ -53,10 +57,57 @@ export async function enqueueSourcePractice(
         [owner, input.noteId],
       )
     ).rows[0]?.value;
+    const adaptive =
+      process.env.ENABLE_DECK_PRACTICE === "true" &&
+      session.aiPolicy === DECK_PRACTICE_VERSION;
+    const review =
+      adaptive && input.reviewId
+        ? (
+            await db.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='reviews' AND id=$2 AND deleted=false",
+              [owner, input.reviewId],
+            )
+          ).rows[0]?.value
+        : undefined;
+    const card = review
+      ? (
+          await db.query(
+            "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='cards' AND id=$2 AND deleted=false",
+            [owner, review.cardId],
+          )
+        ).rows[0]?.value
+      : undefined;
+    const type =
+      note && adaptive
+        ? (
+            await db.query(
+              "SELECT value FROM public.documents WHERE owner_id=$1 AND entity='types' AND id=$2 AND deleted=false",
+              [owner, note.typeId],
+            )
+          ).rows[0]?.value
+        : undefined;
+    const source =
+      note && card && type ? deckSource(note, type, card) : undefined;
+    if (
+      adaptive &&
+      (!review ||
+        review.sessionId !== session.id ||
+        review.noteId !== note?.id ||
+        review.contentVersion !== note.version ||
+        ["undone", "concurrent"].includes(review.status) ||
+        (session.deckId && card?.deckId !== session.deckId) ||
+        !source)
+    )
+      throw new HttpError(
+        422,
+        "REVIEWED_SOURCE_REQUIRED",
+        "This reviewed card does not have enough supported answer text. Regular review continues.",
+      );
     if (
       !note ||
-      !sourceUnits(note).length ||
-      !sourceVariants(note).includes(input.variant)
+      (!adaptive &&
+        (!sourceUnits(note).length ||
+          !sourceVariants(note).includes(input.variant as SourceVariant)))
     )
       throw new HttpError(
         422,
@@ -93,7 +144,8 @@ export async function enqueueSourcePractice(
         note: note.id,
         version: note.version,
         variant: input.variant,
-        policy: SOURCE_PRACTICE_VERSION,
+        policy: adaptive ? DECK_PRACTICE_VERSION : SOURCE_PRACTICE_VERSION,
+        ...(adaptive ? { reviewId: input.reviewId } : {}),
       }),
     );
     const prior = (
@@ -105,11 +157,14 @@ export async function enqueueSourcePractice(
     if (prior) return prior;
     const counts = (
       await db.query(
-        "SELECT count(*) FILTER (WHERE created_at>now()-interval '1 day') total,count(*) FILTER (WHERE input->>'sessionId'=$2) session FROM public.jobs WHERE owner_id=$1",
-        [owner, session.id],
+        "SELECT count(*) FILTER (WHERE created_at>now()-interval '1 day') total,count(*) FILTER (WHERE input->>'sessionId'=$2 AND (kind='generate' OR NOT $3::boolean)) session FROM public.jobs WHERE owner_id=$1",
+        [owner, session.id, adaptive],
       )
     ).rows[0];
-    if (Number(counts.total) >= 30 || Number(counts.session) >= 3)
+    if (
+      Number(counts.total) >= 30 ||
+      Number(counts.session) >= (adaptive ? 6 : 3)
+    )
       throw new HttpError(
         429,
         "DAILY_QUOTA",
@@ -122,12 +177,23 @@ export async function enqueueSourcePractice(
           owner,
           key,
           JSON.stringify({
-            mode: "source_practice",
+            mode: adaptive ? "deck_practice_v2" : "source_practice",
             sessionId: session.id,
             consent: true,
             noteId: note.id,
             version: note.version,
             variant: input.variant,
+            ...(adaptive
+              ? {
+                  cardId: card.id,
+                  sourceContext: {
+                    cardId: card.id,
+                    targetAnswer: source!.answer,
+                    reviewId: review.id,
+                    reviewsAtRequest: session.reviews,
+                  },
+                }
+              : {}),
           }),
         ],
       )

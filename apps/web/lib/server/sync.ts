@@ -103,8 +103,26 @@ async function validatePut(db: PoolClient, owner: string, m: Mutation) {
     for (const s of activity.sources)
       await ownedRef(db, owner, "notes", s.noteId);
   }
-  if (m.entity === "attempts")
+  if (m.entity === "attempts") {
     await ownedRef(db, owner, "activities", value.activityId);
+    const prior = await get(db, owner, "attempts", value.id);
+    if (
+      value.modelGrade !== undefined &&
+      stableJson(value.modelGrade) !== stableJson(prior?.value.modelGrade)
+    )
+      throw new HttpError(
+        403,
+        "SERVER_FEEDBACK_REQUIRED",
+        "Model feedback can only be published by the worker.",
+      );
+    if (prior?.value.modelGrade && value.answer !== prior.value.answer)
+      throw new HttpError(
+        409,
+        "ANSWER_CHANGED",
+        "This answer already has model feedback. Its source response must be preserved.",
+      );
+    if (prior?.value.modelGrade) value.modelGrade = prior.value.modelGrade;
+  }
   if (m.entity === "reviews" || m.entity === "undos")
     throw new HttpError(
       400,

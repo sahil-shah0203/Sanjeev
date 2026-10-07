@@ -1,6 +1,9 @@
+"use client";
 import Link from "next/link";
+import { useLibrary } from "../LibraryProvider";
 import { PageTitle } from "../ui";
 export default function Help() {
+  const { features } = useLibrary();
   return (
     <div className="help-guide">
       <PageTitle
@@ -73,28 +76,32 @@ export default function Help() {
           <p>
             Before a timed session, optionally turn on{" "}
             <strong>Add AI-generated questions</strong>. It starts off.
-            Signed-in, online students can get occasional source-completion,
-            source-wording choices, comparisons, or restatements from a selected
-            note. Some notes cannot support a question, so we continue ordinary
-            review.
+            Signed-in, online students can get short-answer, multiple-choice,
+            comparison, or explanation practice from reviewed source material.
+            Some notes cannot support a question, so ordinary review continues.
           </p>
           <p>
             Selected source text goes to the configured AI provider (shown
             beside the toggle); provider retention policies apply. Never include
-            patient-identifying information. The model selects from constrained
-            source exercises; it does not author new clinical cases or give
-            medical advice. Your deck itself may contain mistakes or outdated
-            information.
+            patient-identifying information.{" "}
+            {features.deckPractice
+              ? "The model can rephrase questions, suggest distractors, and give concise source-grounded feedback."
+              : "The model selects from constrained source exercises."}{" "}
+            It does not author new clinical cases or give medical advice. Your
+            deck itself may contain mistakes or outdated information.
           </p>
           <p>
             Every question is labeled unverified and includes its source. Skip
-            or report anything questionable. Free-text responses are for
-            self-checking, not an AI medical grade. Extra questions never rate
-            your original card or change FSRS. These formats are an experiment,
-            not a proven learning advantage.
+            or report anything questionable.{" "}
+            {features.deckPractice
+              ? "AI feedback is an unverified suggestion; compare it with the source and dispute it if needed."
+              : "Free-text responses are for self-checking."}{" "}
+            Extra questions never rate your original card or change FSRS. These
+            formats are an experiment, not a proven learning advantage.
           </p>
           <p>
-            Expect at most one extra question per ten original reviews and a
+            Expect at most one extra question per{" "}
+            {features.deckPractice ? "four" : "ten"} original reviews and a
             small part of your timed session. Generation runs while you review;
             a slow or unavailable service never holds up your cards.
           </p>
