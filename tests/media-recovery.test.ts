@@ -140,3 +140,46 @@ it("rejects damaged downloads without saving them", async () => {
     await db.delete();
   }
 });
+it("downloads in parallel and publishes no incomplete mask set", async () => {
+  const db = new Library(id());
+  try {
+    const blob = new Blob(["synthetic"], { type: "image/png" }),
+      digest = await hash(await blob.arrayBuffer());
+    const assets = [0, 1, 2].map((index) => ({
+      id: id(),
+      namespace: target,
+      name: `mask-${index}.png`,
+      mime: "image/png",
+      hash: digest,
+      size: blob.size,
+      cloud: false,
+      url: `https://storage.example/${index}`,
+    }));
+    const releases: Array<() => void> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string) =>
+        path === "/api/media/resolve"
+          ? Response.json({ assets })
+          : new Promise<Response>((resolve) => {
+              releases.push(() => resolve(new Response(blob)));
+            }),
+      ),
+    );
+    const pending = recoverCardMedia(
+      db,
+      target,
+      assets.map((asset) => asset.name),
+    );
+    await vi.waitFor(() => expect(releases.length).toBe(3));
+    releases[0]();
+    releases[1]();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(await db.media.count()).toBe(0);
+    releases[2]();
+    expect(await pending).toBe(3);
+    expect(await db.media.count()).toBe(3);
+  } finally {
+    await db.delete();
+  }
+});

@@ -20,9 +20,12 @@ export default function OcclusionImage({
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(false);
+  const decoded = useRef<
+    { url: string; image: Promise<HTMLImageElement> } | undefined
+  >(undefined);
+  const [paintedAnswer, setPaintedAnswer] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
     setError("");
     const run = async () => {
       const match = /<img\b[^>]*\bsrc=["']([^"']+)["']/i.exec(
@@ -40,9 +43,19 @@ export default function OcclusionImage({
         return;
       }
       const shapes = occlusionShapes(note.fields[0], card.ord + 1);
-      const img = new Image();
-      img.src = url;
-      await img.decode();
+      if (decoded.current?.url !== url) {
+        const image = (async () => {
+          const img = new Image();
+          img.src = url;
+          await img.decode();
+          return img;
+        })();
+        decoded.current = { url, image };
+        void image.catch(() => {
+          if (decoded.current?.url === url) decoded.current = undefined;
+        });
+      }
+      const img = await decoded.current!.image;
       if (cancelled || !canvas.current) return;
       if (img.naturalWidth * img.naturalHeight > 40000000)
         throw new Error("This image is too large for the mask renderer.");
@@ -86,6 +99,7 @@ export default function OcclusionImage({
       output.width = buffer.width;
       output.height = buffer.height;
       output.getContext("2d")!.drawImage(buffer, 0, 0);
+      setPaintedAnswer(revealed);
       setReady(true);
     };
     void run().catch((e) => {
@@ -111,7 +125,7 @@ export default function OcclusionImage({
               ref={canvas}
               role="img"
               aria-label={
-                revealed
+                paintedAnswer
                   ? "Image with the requested mask revealed"
                   : "Image occlusion prompt. Recall the label under the highlighted region."
               }

@@ -22,9 +22,10 @@ export default function EnhancedOcclusionImage({
   const [ready, setReady] = useState(false);
   const [zoom, setZoom] = useState(false);
   const [hideMasks, setHideMasks] = useState(false);
+  const decoded = useRef(new Map<string, Promise<HTMLImageElement>>());
+  const [paintedAnswer, setPaintedAnswer] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
     setError("");
     const run = async () => {
       if (loading) return;
@@ -35,15 +36,24 @@ export default function EnhancedOcclusionImage({
           throw new Error(
             "An image or mask is missing or cannot be safely displayed.",
           );
-        const image = new Image();
-        image.src = url;
-        await image.decode();
-        if (
-          !image.naturalWidth ||
-          image.naturalWidth * image.naturalHeight > 40000000
-        )
-          throw new Error("The image exceeds the mask renderer's pixel limit.");
-        return image;
+        const existing = decoded.current.get(url);
+        if (existing) return existing;
+        const pending = (async () => {
+          const image = new Image();
+          image.src = url;
+          await image.decode();
+          if (
+            !image.naturalWidth ||
+            image.naturalWidth * image.naturalHeight > 40000000
+          )
+            throw new Error(
+              "The image exceeds the mask renderer's pixel limit.",
+            );
+          return image;
+        })();
+        decoded.current.set(url, pending);
+        void pending.catch(() => decoded.current.delete(url));
+        return pending;
       };
       const [base, mask] = await Promise.all([
         load(sources.image),
@@ -70,7 +80,10 @@ export default function EnhancedOcclusionImage({
       output.width = buffer.width;
       output.height = buffer.height;
       output.getContext("2d")!.drawImage(buffer, 0, 0);
+      setPaintedAnswer(revealed);
       setReady(true);
+      // Decode the other mask without hiding the already rendered safe canvas.
+      if (!revealed) void load(sources.answer).catch(() => {});
     };
     void run().catch((e) => {
       if (!cancelled) setError(e.message);
@@ -95,7 +108,9 @@ export default function EnhancedOcclusionImage({
               ref={canvas}
               role="img"
               aria-label={
-                revealed ? "Image occlusion answer" : "Image occlusion question"
+                paintedAnswer
+                  ? "Image occlusion answer"
+                  : "Image occlusion question"
               }
               style={{
                 display: ready ? "block" : "none",

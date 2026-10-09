@@ -29,14 +29,19 @@ export async function POST(
       const rows = await transaction(user.id, (db) =>
         mediaRecoveryCandidates(db, user.id, namespace, names),
       );
-      const assets = [];
-      for (const row of rows) {
-        const { data, error } = await store.createSignedUrl(
-          row.object_key,
-          120,
-        );
-        if (error || !data) throw new Error("Download ticket failed");
-        assets.push({
+      if (!rows.length) return NextResponse.json({ assets: [] });
+      const { data, error } = await store.createSignedUrls(
+        rows.map((row) => row.object_key),
+        120,
+      );
+      if (error || !data) throw new Error("Download ticket failed");
+      const tickets = new Map(
+        data.map((ticket) => [ticket.path, ticket.signedUrl]),
+      );
+      const assets = rows.map((row) => {
+        const url = tickets.get(row.object_key);
+        if (!url) throw new Error("Download ticket failed");
+        return {
           id: row.target_id ?? newId(),
           namespace,
           name: row.name,
@@ -44,9 +49,9 @@ export async function POST(
           size: Number(row.size),
           mime: row.mime,
           cloud: !!row.target_complete,
-          url: data.signedUrl,
-        });
-      }
+          url,
+        };
+      });
       return NextResponse.json({ assets });
     }
     if (action === "upload") {

@@ -27,44 +27,57 @@ export function recoverCardMedia(
           result.error?.message ??
             "Images could not be recovered. Your study progress is saved.",
         );
-      for (const asset of result.assets as (Omit<MediaAsset, "blob"> & {
+      const downloaded: MediaAsset[] = [];
+      const assets = result.assets as (Omit<MediaAsset, "blob"> & {
         url: string;
-      })[]) {
-        if (
-          asset.namespace !== namespace ||
-          !names.includes(asset.name) ||
-          asset.size > 64 * 1024 ** 2
-        )
-          throw new Error("Invalid media recovery response.");
-        const download = await fetch(asset.url);
-        if (!download.ok)
-          throw new Error(
-            "Image download failed. Your progress is saved; retry when online.",
-          );
-        const bytes = await download.arrayBuffer();
-        if (
-          bytes.byteLength !== asset.size ||
-          (await hash(bytes)) !== asset.hash
-        )
-          throw new Error("Image recovery failed its integrity check.");
-        const { url, ...metadata } = asset;
-        await db.transaction("rw", db.media, async () => {
+      })[];
+      for (let position = 0; position < assets.length; position += 3) {
+        const batch = await Promise.all(
+          assets.slice(position, position + 3).map(async (asset) => {
+            if (
+              asset.namespace !== namespace ||
+              !names.includes(asset.name) ||
+              asset.size > 64 * 1024 ** 2
+            )
+              throw new Error("Invalid media recovery response.");
+            const download = await fetch(asset.url);
+            if (!download.ok)
+              throw new Error(
+                "Image download failed. Your progress is saved; retry when online.",
+              );
+            const bytes = await download.arrayBuffer();
+            if (
+              bytes.byteLength !== asset.size ||
+              (await hash(bytes)) !== asset.hash
+            )
+              throw new Error("Image recovery failed its integrity check.");
+            const { url, ...metadata } = asset;
+            return {
+              ...metadata,
+              blob: new Blob([bytes], { type: asset.mime }),
+            };
+          }),
+        );
+        downloaded.push(...batch);
+      }
+      // Publish once so one download does not tear down another image's URLs.
+      await db.transaction("rw", db.media, async () => {
+        for (const asset of downloaded) {
           const local = await db.media
             .where("[namespace+name]")
             .equals([namespace, asset.name])
             .first();
           if (local?.blob?.size === asset.size && local.hash === asset.hash)
-            return;
+            continue;
           if (local && local.hash !== asset.hash)
             throw new Error("A local image conflict needs review.");
           await db.media.put({
-            ...metadata,
+            ...asset,
             id: local?.id ?? asset.id,
-            blob: new Blob([bytes], { type: asset.mime }),
           });
           recovered++;
-        });
-      }
+        }
+      });
     }
     return recovered;
   })();

@@ -254,7 +254,7 @@ export default function CardContent({
         />
         {type.kind === "occlusion" && (
           <OcclusionImage
-            key={`${card.id}:${note.version}:${revealed}`}
+            key={`${card.id}:${note.version}`}
             card={card}
             note={note}
             revealed={revealed}
@@ -263,7 +263,7 @@ export default function CardContent({
         )}{" "}
         {isEnhancedOcclusion(type) && (
           <EnhancedOcclusionImage
-            key={`${card.id}:${note.version}:${revealed}`}
+            key={`${card.id}:${note.version}`}
             note={note}
             type={type}
             revealed={revealed}
