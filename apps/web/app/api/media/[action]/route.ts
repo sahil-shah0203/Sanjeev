@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { hash } from "@recall/domain";
+import { hash, id as newId } from "@recall/domain";
+import { mediaRecoveryCandidates } from "../../../../lib/server/media-recovery";
 import {
   identity,
   body,
@@ -16,8 +17,38 @@ export async function POST(
   try {
     const { user } = await identity(request);
     const { action } = await params;
-    const input = await body(request, 8192);
+    const input = await body(request, action === "resolve" ? 48 * 1024 : 8192);
     const store = adminStorage().storage.from("recall-media");
+    if (action === "resolve") {
+      const { namespace, names } = z
+        .object({
+          namespace: z.string().uuid(),
+          names: z.array(z.string().min(1).max(1024)).min(1).max(32),
+        })
+        .parse(input);
+      const rows = await transaction(user.id, (db) =>
+        mediaRecoveryCandidates(db, user.id, namespace, names),
+      );
+      const assets = [];
+      for (const row of rows) {
+        const { data, error } = await store.createSignedUrl(
+          row.object_key,
+          120,
+        );
+        if (error || !data) throw new Error("Download ticket failed");
+        assets.push({
+          id: row.target_id ?? newId(),
+          namespace,
+          name: row.name,
+          hash: row.hash,
+          size: Number(row.size),
+          mime: row.mime,
+          cloud: !!row.target_complete,
+          url: data.signedUrl,
+        });
+      }
+      return NextResponse.json({ assets });
+    }
     if (action === "upload") {
       const m = z
         .object({

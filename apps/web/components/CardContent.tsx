@@ -14,6 +14,7 @@ import OcclusionImage from "./OcclusionImage";
 import EnhancedOcclusionImage from "./EnhancedOcclusionImage";
 import { isEnhancedOcclusion } from "../../../packages/card-renderer/src/enhanced-occlusion";
 import { looksLikeSvg, safeSvg } from "../../../packages/card-renderer/src/svg";
+import { recoverCardMedia } from "../features/media-recovery";
 export default function CardContent({
   card,
   note,
@@ -29,7 +30,18 @@ export default function CardContent({
   count?: number;
   showExtras?: boolean;
 }) {
-  const { db } = useLibrary();
+  const { db, user } = useLibrary();
+  const [recovering, setRecovering] = useState(false);
+  const [mediaError, setMediaError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const recoveryAttempt = useRef("");
+  const mediaMounted = useRef(false);
+  useEffect(() => {
+    mediaMounted.current = true;
+    return () => {
+      mediaMounted.current = false;
+    };
+  }, []);
   const names = useMemo(() => {
     const found = new Set<string>();
     const text = [
@@ -61,8 +73,46 @@ export default function CardContent({
     [db, note.namespace, names],
   );
   const assetKey = assets
-    ?.map((asset) => `${asset.namespace}/${asset.name}/${asset.hash}`)
+    ?.map(
+      (asset) =>
+        `${asset.namespace}/${asset.name}/${asset.hash}/${asset.mime}/${asset.blob?.size ?? -1}`,
+    )
     .join("\n");
+  useEffect(() => {
+    if (!assets || !user || !navigator.onLine || recovering) return;
+    const missing = names
+      .filter(
+        (name) =>
+          !assets.some(
+            (asset) => asset.name === name && asset.blob?.size === asset.size,
+          ),
+      )
+      .filter((name) => !/^(?:[a-z]+:|\/\/)/i.test(name));
+    if (!missing.length) return;
+    const key = `${note.namespace}:${missing.join("\n")}:${retry}`;
+    if (recoveryAttempt.current === key) return;
+    recoveryAttempt.current = key;
+    setRecovering(true);
+    setMediaError("");
+    void recoverCardMedia(db, note.namespace, missing)
+      .then((count) => {
+        if (mediaMounted.current && !count)
+          setMediaError(
+            "These images have not finished syncing. Your progress is safe.",
+          );
+      })
+      .catch((error) => {
+        if (mediaMounted.current)
+          setMediaError(
+            error instanceof Error
+              ? error.message
+              : "Images could not be recovered.",
+          );
+      })
+      .finally(() => {
+        if (mediaMounted.current) setRecovering(false);
+      });
+  }, [db, user?.id, note.namespace, names, assetKey, retry, recovering]);
   const [assetSnapshot, setAssetSnapshot] = useState<{
     key: string;
     assets: MediaAsset[];
@@ -98,6 +148,7 @@ export default function CardContent({
       for (const asset of stableAssets) {
         if (!/^(?:image|audio|video)\//.test(asset.mime)) continue;
         let blob = asset.blob;
+        if (!blob || typeof blob.slice !== "function") continue;
         // Validate again at display time, including media restored or synced
         // from another client. Only a rebuilt, resource-free SVG becomes a URL.
         if (
@@ -157,8 +208,31 @@ export default function CardContent({
         {output.error}
       </p>
     );
+  if (
+    names.length &&
+    (assets === undefined || recovering || prepared?.key !== assetKey)
+  )
+    return (
+      <p className="muted" role="status">
+        {recovering ? "Recovering card images…" : "Preparing card media…"}
+      </p>
+    );
   return (
     <>
+      {mediaError && (
+        <p role="status" className="notice">
+          {mediaError}{" "}
+          <button
+            className="text-button"
+            onClick={() => {
+              recoveryAttempt.current = "";
+              setRetry((value) => value + 1);
+            }}
+          >
+            Retry images
+          </button>
+        </p>
+      )}
       <div
         className="card-content"
         onClick={(e) => {

@@ -30,6 +30,8 @@ Multiple-choice grading uses the canonical source answer. Written responses can 
 
 The speculative media preload/cache introduced with this QA release has been reverted after an LSOM masked-image regression. Card media now uses the previous component-owned URL lifecycle, asset loading, SVG safety checks, and mask rendering. A temporary loading transition can still appear while assets prepare; smoother transitions will be revisited separately. Imported media and study progress are preserved.
 
+For signed-in learners, missing local card media is recovered on demand from private cloud storage. Incomplete duplicate imports may use a complete copy only within the same account and with an identical archive SHA-256 hash. Existing conflicting media hashes are never overwritten. Recovered bytes must match their recorded size and SHA-256 hash, and masks still pass the existing SVG and canvas safety checks. Recovery writes only local media; it never resets a library or changes review progress. A preparing/recovering message and retry control distinguish downloads from unavailable files. Files absent from every matching cloud copy still need their original local import to finish uploading.
+
 AI questions, rationales, and written feedback use a brief letter-by-letter visual reveal, capped at 1.6 seconds. The full text reserves its layout space to avoid shifting answer controls. Reduced-motion preferences show it instantly, screen readers receive the complete text, and inputs remain usable throughout. This is a presentation effect after validation, not streamed unverified model output. The study form has a concise explanation prompt and a single skip control.
 
 ## Focused verification and friend testing
